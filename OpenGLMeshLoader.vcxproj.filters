@@ -36,4 +36,8 @@
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="CUPCAKE_FIX_INSTRUCTIONS.txt" />
+    <Text Include="COLLISION_FIX_INSTRUCTIONS.txt" />
+  </ItemGroup>
 </Project>
