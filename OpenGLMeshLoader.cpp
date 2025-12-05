@@ -47,7 +47,8 @@ CameraMode currentCamera = THIRD_PERSON;
 // Model Variables
 //Model_3DS model_house;
 //Model_3DS model_tree;
-Model_3DS model_donut;
+//Model_3DS model_donut;
+Model_OBJ model_donut;
 Model_OBJ model_candy_kingdom;
 Model_OBJ model_bmo;
 Model_OBJ model_finn;
@@ -602,12 +603,15 @@ void LoadAssets()
 	printf("Finn Ready.\n");
 
 	// --- DONUT ---
-	printf("Loading 3DS Model: Donut...\n");
-	model_donut.Load("models/donut/donut.3ds");
-	model_donut.scale = 5.0f;  // Adjust scale as needed
-	model_donut.pos.x = 50.0f;  // Position it visible in scene
-	model_donut.pos.y = 5.0f;
-	model_donut.pos.z = 0.0f;
+	printf("Loading OBJ Model: Donut...\n");
+	model_donut.Load("models/donut/donut.obj", "models/donut/");
+	// Make donut similar size to cupcake and place it beside Finn
+	model_donut.scale_xyz =50.0f; // match cupcake scale_xyz =50.0f
+	model_donut.pos_x = model_finn.pos_x +5.0f; // place to the right of Finn
+	model_donut.pos_y = model_finn.pos_y; // same ground level as Finn
+	model_donut.pos_z = model_finn.pos_z +2.0f; // slightly in front of Finn
+	model_donut.rot_y =0.0f;
+	model_donut.GenerateDisplayList();
 	printf("Donut Loaded.\n");
 
 	// --- OTHER TEXTURES ---
