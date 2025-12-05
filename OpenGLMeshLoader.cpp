@@ -40,6 +40,10 @@ Vector Up(0, 1, 0);
 
 int cameraZoom = 0;
 
+// Camera Mode
+enum CameraMode { FIRST_PERSON, THIRD_PERSON };
+CameraMode currentCamera = THIRD_PERSON;
+
 // Model Variables
 //Model_3DS model_house;
 //Model_3DS model_tree;
@@ -182,10 +186,49 @@ void myDisplay(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	// Update camera based on mode
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	
+	if (currentCamera == FIRST_PERSON)
+	{
+		// First person - camera is at BMO's position, looking forward
+		gluLookAt(
+			model_bmo.pos_x, model_bmo.pos_y +2.0f, model_bmo.pos_z, // Eye at BMO's position + height offset
+			model_bmo.pos_x + sin(model_bmo.rot_y *3.14159 /180.0), model_bmo.pos_y +2.0f, model_bmo.pos_z - cos(model_bmo.rot_y *3.14159 /180.0), // Look in direction BMO is facing
+			0,1,0 // Up vector
+		);
+	}
+	else // THIRD_PERSON
+	{
+		// Third person - camera behind and above BMO (follow BMO)
+		float camDistance = 15.0f;
+		float camHeight = 8.0f;
+		float angle = model_bmo.rot_y * 3.14159265f / 180.0f;
 
+		// Calculate the direction BMO is facing
+		float forwardX = sinf(angle);
+		float forwardZ = -cosf(angle);
 
-	GLfloat lightIntensity[] = { 0.7, 0.7, 0.7, 1.0f };
-	GLfloat lightPosition[] = { 0.0f, 100.0f, 0.0f, 0.0f };
+		// Position camera behind BMO (opposite of forward direction)
+		float camX = model_bmo.pos_x - forwardX * camDistance;
+		float camY = model_bmo.pos_y + camHeight;
+		float camZ = model_bmo.pos_z - forwardZ * camDistance;
+
+		// Look at point slightly above BMO
+		float targetX = model_bmo.pos_x;
+		float targetY = model_bmo.pos_y + 2.0f;
+		float targetZ = model_bmo.pos_z;
+
+		gluLookAt(
+			camX, camY, camZ,    // Camera position (behind BMO)
+			targetX, targetY, targetZ,  // Look at BMO
+			0.0f, 1.0f, 0.0f          // Up vector
+		);
+	}
+
+	GLfloat lightIntensity[] = {0.7,0.7,0.7,1.0f };
+	GLfloat lightPosition[] = {0.0f,100.0f,0.0f,0.0f };
 	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
 	glLightfv(GL_LIGHT0, GL_AMBIENT, lightIntensity);
 
@@ -223,7 +266,13 @@ void myDisplay(void)
 	//glPopMatrix();
 
 	model_candy_kingdom.Draw();
-	model_bmo.Draw();
+	
+	// Don't draw BMO in first person mode (since camera is at BMO's eyes)
+	if (currentCamera != FIRST_PERSON)
+	{
+		model_bmo.Draw();
+	}
+	
 	model_finn.Draw();
 	model_cupcake.Draw();
 	model_coin.Draw();
@@ -237,6 +286,10 @@ void myDisplay(void)
 //=======================================================================
 void myKeyboard(unsigned char button, int x, int y)
 {
+	float moveSpeed = 2.0f;
+	float rotSpeed = 5.0f;
+	float angle = model_bmo.rot_y * 3.14159 / 180.0;
+	
 	switch (button)
 	{
 	case 'w':
@@ -245,6 +298,59 @@ void myKeyboard(unsigned char button, int x, int y)
 	case 'r':
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		break;
+	
+	// Camera switch
+	case 'c':
+	case 'C':
+		currentCamera = (currentCamera == FIRST_PERSON) ? THIRD_PERSON : FIRST_PERSON;
+		printf("Camera switched to %s\n", currentCamera == FIRST_PERSON ? "First Person" : "Third Person");
+		break;
+	
+	// BMO movement (IJKL) - rotate BMO to face movement direction
+	case 'i':
+	case 'I':
+		// Move forward in current direction
+		model_bmo.pos_x += sin(angle) * moveSpeed;
+		model_bmo.pos_z -= cos(angle) * moveSpeed;
+		break;
+	case 'k':
+	case 'K':
+		// Move backward - rotate 180° to face backward, move, rotate back
+		model_bmo.rot_y += 180.0f;
+		angle = model_bmo.rot_y * 3.14159 / 180.0;
+		model_bmo.pos_x += sin(angle) * moveSpeed;
+		model_bmo.pos_z -= cos(angle) * moveSpeed;
+		model_bmo.rot_y -= 180.0f;
+		break;
+	case 'j':
+	case 'J':
+		// Move left - rotate 90° left, move forward, rotate back
+		model_bmo.rot_y -= 90.0f;
+		angle = model_bmo.rot_y * 3.14159 / 180.0;
+		model_bmo.pos_x += sin(angle) * moveSpeed;
+		model_bmo.pos_z -= cos(angle) * moveSpeed;
+		model_bmo.rot_y += 90.0f;
+		break;
+	case 'l':
+	case 'L':
+		// Move right - rotate 90° right, move forward, rotate back
+		model_bmo.rot_y += 90.0f;
+		angle = model_bmo.rot_y * 3.14159 / 180.0;
+		model_bmo.pos_x += sin(angle) * moveSpeed;
+		model_bmo.pos_z -= cos(angle) * moveSpeed;
+		model_bmo.rot_y -= 90.0f;
+		break;
+	
+	// Rotate BMO permanently
+	case 'u':
+	case 'U':
+		model_bmo.rot_y -= rotSpeed;
+		break;
+	case 'o':
+	case 'O':
+		model_bmo.rot_y += rotSpeed;
+		break;
+		
 	case 27:
 		exit(0);
 		break;
@@ -252,6 +358,43 @@ void myKeyboard(unsigned char button, int x, int y)
 		break;
 	}
 
+	glutPostRedisplay();
+}
+
+//=======================================================================
+// Special Keys Function (Arrow keys for movement)
+//=======================================================================
+void mySpecialKeys(int key, int x, int y)
+{
+	float moveSpeed = 2.0f;
+	float rotSpeed = 5.0f;
+	float angle = model_bmo.rot_y * 3.14159 / 180.0;
+	
+	switch (key)
+	{
+	case GLUT_KEY_UP:
+		// Move forward in current direction
+		model_bmo.pos_x += sin(angle) * moveSpeed;
+		model_bmo.pos_z -= cos(angle) * moveSpeed;
+		break;
+	case GLUT_KEY_DOWN:
+		// Move backward - rotate 180°, move, rotate back
+		model_bmo.rot_y += 180.0f;
+		angle = model_bmo.rot_y * 3.14159 / 180.0;
+		model_bmo.pos_x += sin(angle) * moveSpeed;
+		model_bmo.pos_z -= cos(angle) * moveSpeed;
+		model_bmo.rot_y -= 180.0f;
+		break;
+	case GLUT_KEY_LEFT:
+		// Rotate left permanently
+		model_bmo.rot_y -= rotSpeed;
+		break;
+	case GLUT_KEY_RIGHT:
+		// Rotate right permanently
+		model_bmo.rot_y += rotSpeed;
+		break;
+	}
+	
 	glutPostRedisplay();
 }
 
@@ -396,11 +539,18 @@ void LoadAssets()
 
 
 	// --- FINN (Uncomment if needed) ---
-	/*
 	printf("Loading OBJ Model: Finn...\n");
 	model_finn.Load("Models/finn/Finn.obj", "Models/finn/");
-	model_finn.scale_xyz = 100.0f;
-	*/
+	
+	// Positioning - place Finn next to BMO (smaller size)
+	model_finn.scale_xyz = 0.1f;   // Half the size of BMO (BMO is 10.0f)
+	model_finn.pos_x = 65.0f;      // Same X as BMO
+	model_finn.pos_y = 0.0f;
+	model_finn.pos_z = 8.0f; // Closer to BMO (standing right next to him)
+	model_finn.rot_y = -90.0f;   // Face same direction as BMO
+				
+	model_finn.GenerateDisplayList();
+	printf("Finn Ready.\n");
 
 	// --- OTHER TEXTURES ---
 	//tex_ground.Load("Textures/ground.bmp");
@@ -426,6 +576,8 @@ void main(int argc, char** argv)
 	glutDisplayFunc(myDisplay);
 
 	glutKeyboardFunc(myKeyboard);
+	
+	glutSpecialFunc(mySpecialKeys);  // Add special keys handler
 
 	glutMotionFunc(myMotion);
 
@@ -438,6 +590,15 @@ void main(int argc, char** argv)
 
 	LoadAssets();
 	printf("Entering Main Loop.\n");
+	printf("\n=== CONTROLS ===\n");
+	printf("Arrow Keys / IJKL: Move BMO\n");
+	printf("U/O: Rotate BMO left/right\n");
+	printf("C: Switch between First Person (BMO's view) and Third Person (behind Finn)\n");
+	printf("W: Wireframe mode\n");
+	printf("R: Fill mode\n");
+	printf("ESC: Exit\n");
+	printf("================\n\n");
+	
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
