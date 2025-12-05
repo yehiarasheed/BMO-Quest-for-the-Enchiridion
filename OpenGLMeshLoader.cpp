@@ -50,10 +50,11 @@ CameraMode currentCamera = THIRD_PERSON;
 Model_3DS model_donut;
 Model_OBJ model_candy_kingdom;
 Model_OBJ model_bmo;
-Model_OBJ model_finn;
+Model_OBJ model_finn; // non-collidable
 Model_OBJ model_cupcake;
 Model_OBJ model_coin;
 Model_OBJ model_lich;
+Model_OBJ model_jelly; // non-collidable
 
 // Cupcake array for collectibles
 const int NUM_CUPCAKES = 5;
@@ -192,8 +193,21 @@ void RenderGround()
 }
 
 //=======================================================================
-// Collision Detection Function
+// Collision Detection Functions
 //=======================================================================
+bool CheckJellyCollision(float newX, float newZ)
+{	
+	float jellyRadius = 1.35f; // Collision radius matches jelly's actual visible size
+	
+	// Calculate distance between proposed BMO position and jelly
+	float dx = newX - model_jelly.pos_x;
+	float dz = newZ - model_jelly.pos_z;
+	float distance = sqrt(dx * dx + dz * dz);
+	
+	// Return true if collision detected
+	return (distance < jellyRadius);
+}
+
 void CheckCupcakeCollisions()
 {
 	for (int i = 0; i < NUM_CUPCAKES; i++)
@@ -299,6 +313,8 @@ void myDisplay(void)
 	model_donut.Draw();
 	glPopMatrix();
 
+	model_jelly.Draw();
+
 	glutSwapBuffers();
 }
 
@@ -331,39 +347,63 @@ void myKeyboard(unsigned char button, int x, int y)
 	case 'i':
 	case 'I':
 		// Move forward in current direction
-		model_bmo.pos_x += sin(angle) * moveSpeed;
-		model_bmo.pos_z -= cos(angle) * moveSpeed;
-		CheckCupcakeCollisions();
+		{
+			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+			if (!CheckJellyCollision(newX, newZ)) {
+				model_bmo.pos_x = newX;
+				model_bmo.pos_z = newZ;
+				CheckCupcakeCollisions();
+			}
+		}
 		break;
 	case 'k':
 	case 'K':
 		// Move backward - rotate 180° to face backward, move, rotate back
-		model_bmo.rot_y += 180.0f;
-		angle = model_bmo.rot_y * 3.14159 / 180.0;
-		model_bmo.pos_x += sin(angle) * moveSpeed;
-		model_bmo.pos_z -= cos(angle) * moveSpeed;
-		model_bmo.rot_y -= 180.0f;
-		CheckCupcakeCollisions();
+		{
+			model_bmo.rot_y += 180.0f;
+			angle = model_bmo.rot_y * 3.14159 / 180.0;
+			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+			model_bmo.rot_y -= 180.0f;
+			if (!CheckJellyCollision(newX, newZ)) {
+				model_bmo.pos_x = newX;
+				model_bmo.pos_z = newZ;
+				CheckCupcakeCollisions();
+			}
+		}
 		break;
 	case 'j':
 	case 'J':
 		// Move left - rotate 90° left, move forward, rotate back
-		model_bmo.rot_y -= 90.0f;
-		angle = model_bmo.rot_y * 3.14159 / 180.0;
-		model_bmo.pos_x += sin(angle) * moveSpeed;
-		model_bmo.pos_z -= cos(angle) * moveSpeed;
-		model_bmo.rot_y += 90.0f;
-		CheckCupcakeCollisions();
+		{
+			model_bmo.rot_y -= 90.0f;
+			angle = model_bmo.rot_y * 3.14159 / 180.0;
+			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+			model_bmo.rot_y += 90.0f;
+			if (!CheckJellyCollision(newX, newZ)) {
+				model_bmo.pos_x = newX;
+				model_bmo.pos_z = newZ;
+				CheckCupcakeCollisions();
+			}
+		}
 		break;
 	case 'l':
 	case 'L':
 		// Move right - rotate 90° right, move forward, rotate back
-		model_bmo.rot_y += 90.0f;
-		angle = model_bmo.rot_y * 3.14159 / 180.0;
-		model_bmo.pos_x += sin(angle) * moveSpeed;
-		model_bmo.pos_z -= cos(angle) * moveSpeed;
-		model_bmo.rot_y -= 90.0f;
-		CheckCupcakeCollisions();
+		{
+			model_bmo.rot_y += 90.0f;
+			angle = model_bmo.rot_y * 3.14159 / 180.0;
+			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+			model_bmo.rot_y -= 90.0f;
+			if (!CheckJellyCollision(newX, newZ)) {
+				model_bmo.pos_x = newX;
+				model_bmo.pos_z = newZ;
+				CheckCupcakeCollisions();
+			}
+		}
 		break;
 	
 	// Rotate BMO permanently
@@ -399,18 +439,30 @@ void mySpecialKeys(int key, int x, int y)
 	{
 	case GLUT_KEY_UP:
 		// Move forward in current direction
-		model_bmo.pos_x += sin(angle) * moveSpeed;
-		model_bmo.pos_z -= cos(angle) * moveSpeed;
-		CheckCupcakeCollisions();
+		{
+			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+			if (!CheckJellyCollision(newX, newZ)) {
+				model_bmo.pos_x = newX;
+				model_bmo.pos_z = newZ;
+				CheckCupcakeCollisions();
+			}
+		}
 		break;
 	case GLUT_KEY_DOWN:
 		// Move backward - rotate 180°, move, rotate back
-		model_bmo.rot_y += 180.0f;
-		angle = model_bmo.rot_y * 3.14159 / 180.0;
-		model_bmo.pos_x += sin(angle) * moveSpeed;
-		model_bmo.pos_z -= cos(angle) * moveSpeed;
-		model_bmo.rot_y -= 180.0f;
-		CheckCupcakeCollisions();
+		{
+			model_bmo.rot_y += 180.0f;
+			angle = model_bmo.rot_y * 3.14159 / 180.0;
+			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+			model_bmo.rot_y -= 180.0f;
+			if (!CheckJellyCollision(newX, newZ)) {
+				model_bmo.pos_x = newX;
+				model_bmo.pos_z = newZ;
+				CheckCupcakeCollisions();
+			}
+		}
 		break;
 	case GLUT_KEY_LEFT:
 		// Rotate left permanently
@@ -502,7 +554,7 @@ void LoadAssets()
 	// --- CANDY KINGDOM ---
 	printf("Loading OBJ Model: Candy Kingdom...\n");
 	model_candy_kingdom.Load("Models/candy/candyKingdom.obj", "Models/candy/");
-	model_candy_kingdom.scale_xyz = 200.0f;
+	model_candy_kingdom.scale_xyz = 300.0f;
 	printf("Candy Kingdom Loaded.\n");
 
 	// --- BMO (With Texture Fix) ---
@@ -541,7 +593,7 @@ void LoadAssets()
 	
 	// Create multiple cupcakes at different positions
 	float cupcakeSpacing = 15.0f; // Distance between cupcakes
-	float startZ = 25.0f;         // Start further from Finn
+	float startZ = 60.0f;         // Start further out due to larger candy kingdom
 	
 	for (int i = 0; i < NUM_CUPCAKES; i++)
 	{
@@ -609,6 +661,16 @@ void LoadAssets()
 	model_donut.pos.y = 5.0f;
 	model_donut.pos.z = 0.0f;
 	printf("Donut Loaded.\n");
+
+	// --- JELLY (Non-collidable obstacle) ---
+	printf("Loading OBJ Model: Jelly...\n");
+	model_jelly.Load("models/jelly/jelly.obj", "models/jelly/");
+	model_jelly.scale_xyz = 30.0f;
+	model_jelly.pos_x = 80.0f;  // To the right of cupcake row (cupcakes at X=65)
+	model_jelly.pos_y = 0.0f;   // On the ground
+	model_jelly.pos_z = 50.0f;  // Adjusted for larger candy kingdom
+	model_jelly.GenerateDisplayList();
+	printf("Jelly Ready (Non-collidable obstacle).\n");
 
 	// --- OTHER TEXTURES ---
 	//tex_ground.Load("Textures/ground.bmp");

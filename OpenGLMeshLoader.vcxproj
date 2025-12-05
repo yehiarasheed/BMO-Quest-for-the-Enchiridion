@@ -95,6 +95,7 @@
   <ItemGroup>
     <Text Include="COLLISION_FIX_INSTRUCTIONS.txt" />
     <Text Include="CUPCAKE_FIX_INSTRUCTIONS.txt" />
+    <Text Include="JELLY_COLLISION_INSTRUCTIONS.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
