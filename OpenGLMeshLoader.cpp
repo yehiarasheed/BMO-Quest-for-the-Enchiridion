@@ -47,6 +47,7 @@ CameraMode currentCamera = THIRD_PERSON;
 // Model Variables
 //Model_3DS model_house;
 //Model_3DS model_tree;
+Model_3DS model_donut;
 Model_OBJ model_candy_kingdom;
 Model_OBJ model_bmo;
 Model_OBJ model_finn;
@@ -277,6 +278,11 @@ void myDisplay(void)
 	model_cupcake.Draw();
 	model_coin.Draw();
 	//model_lich.Draw();
+	
+	// Draw Donut
+	glPushMatrix();
+	model_donut.Draw();
+	glPopMatrix();
 
 	glutSwapBuffers();
 }
@@ -551,6 +557,15 @@ void LoadAssets()
 				
 	model_finn.GenerateDisplayList();
 	printf("Finn Ready.\n");
+
+	// --- DONUT ---
+	printf("Loading 3DS Model: Donut...\n");
+	model_donut.Load("models/donut/donut.3ds");
+	model_donut.scale = 5.0f;  // Adjust scale as needed
+	model_donut.pos.x = 50.0f;  // Position it visible in scene
+	model_donut.pos.y = 5.0f;
+	model_donut.pos.z = 0.0f;
+	printf("Donut Loaded.\n");
 
 	// --- OTHER TEXTURES ---
 	//tex_ground.Load("Textures/ground.bmp");
