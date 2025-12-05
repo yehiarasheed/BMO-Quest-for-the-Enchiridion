@@ -578,9 +578,10 @@ void LoadAssets()
 	// 3. Update the GPU
 	model_bmo.GenerateDisplayList();
 
-	// Positioning
+	// Positioning - place BMO close to jelly and cupcakes
 	model_bmo.scale_xyz = 10.0f;
 	model_bmo.pos_x = 65.0f;
+	model_bmo.pos_z = 55.0f;
 	model_bmo.rot_y = -90.0f;
 	printf("BMO Ready.\n");
 
@@ -644,11 +645,11 @@ void LoadAssets()
 	printf("Loading OBJ Model: Finn...\n");
 	model_finn.Load("Models/finn/Finn.obj", "Models/finn/");
 	
-	// Positioning - place Finn next to BMO (smaller size)
-	model_finn.scale_xyz = 0.1f;   // Half the size of BMO (BMO is 10.0f)
-	model_finn.pos_x = 65.0f;      // Same X as BMO
+	// Positioning - place Finn close to jelly and cupcakes
+	model_finn.scale_xyz = 0.1f;
+	model_finn.pos_x = 70.0f;
 	model_finn.pos_y = 0.0f;
-	model_finn.pos_z = 8.0f; // Closer to BMO (standing right next to him)
+	model_finn.pos_z = 53.0f; // Just in front of BMO, near jelly and cupcakes
 	model_finn.rot_y = -90.0f;   // Face same direction as BMO
 				
 	model_finn.GenerateDisplayList();
