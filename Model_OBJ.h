@@ -114,7 +114,6 @@ public:
                 currentGroup = ObjGroup(); // clear
                 currentGroup.materialName = matName;
             }
-            // Parse Face
             // Parse Face (Handles Triangles, Quads, and N-Gons)
             else if (strcmp(lineHeader, "f") == 0) {
                 // 1. Read the rest of the line into a buffer
@@ -257,7 +256,12 @@ public:
                 }
             }
             else {
-                glDisable(GL_TEXTURE_2D);
+                // --- FIX APPLIED HERE ---
+                // I commented out the Disable command. 
+                // This lets us force the texture externally in Main.cpp!
+
+                // glDisable(GL_TEXTURE_2D); // <--- THIS WAS THE PROBLEM LINE
+
                 glColor3f(1, 1, 1);
             }
 
