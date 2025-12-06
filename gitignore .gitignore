@@ -1,0 +1,13 @@
+# Ignore Fire Kingdom assets and temp files
+Models/firekingdom/
+Textures/great-temple-of-the-eternal-fire_textured_u1_v1.bmp
+*.firekingdom.tmp
+
+# Ignore common OS and IDE files
+*.log
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+.DS_Store
+Thumbs.db
