@@ -67,28 +67,11 @@ float cupcakeRotation = 0.0f;
 // Collision detection radius
 float collisionRadius = 1.2f;
 
-// Jump state and movement
-bool isJumping = false;
-float jumpVelocity = 0.0f;
-const float jumpStrength = 0.6f;
-const float gravity = 0.03f;
-
-// Mouse control
-int lastMouseX = -1;
-int lastMouseY = -1;
-bool mouseRotationEnabled = false;
-float mouseSensitivity = 0.2f;
-
-// FPS-style mouse look
-bool mouseLookEnabled = true;
-int centerX = WIDTH / 2;
-int centerY = HEIGHT / 2;
-bool firstMouse = true;
 // Score
 int score = 0;
 bool coinVisible = true;
-const int CUPCAKE_POINTS = 10;
-const int COIN_POINTS = 5;
+const int CUPCAKE_POINTS = 100;
+const int COIN_POINTS = 20;
 
 // Textures
 GLTexture tex_ground;
@@ -286,38 +269,6 @@ void CheckCupcakeCollisions()
 	}
 }
 
-// Try to move BMO to new position; if collides with jelly, apply bounce
-bool TryMove(float newX, float newZ)
-{
-    if (CheckJellyCollision(newX, newZ))
-    {
-        // Bounce back from jelly
-        float dx = model_bmo.pos_x - model_jelly.pos_x;
-        float dz = model_bmo.pos_z - model_jelly.pos_z;
-        float len = sqrt(dx*dx + dz*dz);
-        float nx = 0.0f, nz = -1.0f;
-        if (len > 0.001f) { nx = dx / len; nz = dz / len; }
-
-        float pushBack = 2.0f;
-        model_bmo.pos_x = model_jelly.pos_x + nx * (pushBack + 1.0f);
-        model_bmo.pos_z = model_jelly.pos_z + nz * (pushBack + 1.0f);
-
-        // vertical bounce
-        if (!isJumping) {
-            isJumping = true;
-            jumpVelocity = jumpStrength * 0.9f;
-        } else if (jumpVelocity < 0.0f) {
-            jumpVelocity = jumpStrength * 1.8f;
-        }
-
-        return false;
-    }
-
-    model_bmo.pos_x = newX;
-    model_bmo.pos_z = newZ;
-    return true;
-}
-
 //=======================================================================
 // Display Function
 //=======================================================================
@@ -380,7 +331,7 @@ void myDisplay(void)
 		}
 	}
 
-	model_coin.Draw();
+    if (coinVisible) model_coin.Draw();
 
 	// ============================================
 	// --- DRAW JELLY ---
@@ -564,84 +515,39 @@ void mySpecialKeys(int key, int x, int y)
 }
 
 //=======================================================================
-// Motion Function (Mouse Movement - FPS Style)
+// Motion Function
 //=======================================================================
 void myMotion(int x, int y)
 {
-	if (!mouseLookEnabled) return;
-
-	if (firstMouse) {
-		lastMouseX = x;
-		lastMouseY = y;
-		firstMouse = false;
-		return;
+	y = HEIGHT - y;
+	if (cameraZoom - y > 0)
+	{
+		Eye.x += -0.1;
+		Eye.z += -0.1;
 	}
-
-	// Calculate mouse movement delta from center
-	int deltaX = x - centerX;
-	int deltaY = y - centerY;
-
-	// Only update if mouse moved significantly from center
-	if (abs(deltaX) > 1 || abs(deltaY) > 1) {
-		// Rotate BMO based on horizontal mouse movement
-		model_bmo.rot_y -= deltaX * mouseSensitivity;
-
-		// Normalize rotation to 0-360 range
-		while (model_bmo.rot_y > 360.0f) model_bmo.rot_y -= 360.0f;
-		while (model_bmo.rot_y < 0.0f) model_bmo.rot_y += 360.0f;
-
-		// Re-center cursor for continuous rotation
-		glutWarpPointer(centerX, centerY);
+	else
+	{
+		Eye.x += 0.1;
+		Eye.z += 0.1;
 	}
-
+	cameraZoom = y;
+	glLoadIdentity();
+	gluLookAt(Eye.x, Eye.y, Eye.z, At.x, At.y, At.z, Up.x, Up.y, Up.z);
+	GLfloat light_position[] = { 0.0f, 10.0f, 0.0f, 1.0f };
+	glLightfv(GL_LIGHT0, GL_POSITION, light_position);
 	glutPostRedisplay();
 }
 
 //=======================================================================
-// Passive Motion Function (Mouse Look when not clicking)
-//=======================================================================
-void myPassiveMotion(int x, int y)
-{
-	// Call the same motion handler for FPS-style look
-	myMotion(x, y);
-}
-
-//=======================================================================
-// Mouse Function (Click Handlers)
+// Mouse Function
 //=======================================================================
 void myMouse(int button, int state, int x, int y)
 {
-	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
+	y = HEIGHT - y;
+	if (state == GLUT_DOWN)
 	{
-		// Left click = Jump
-		if (!isJumping) {
-			isJumping = true;
-			jumpVelocity = jumpStrength;
-			printf("Jump! (mouse)\n");
-		}
+		cameraZoom = y;
 	}
-	else if (button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN)
-	{
-		// Right click = Toggle camera
-		currentCamera = (currentCamera == FIRST_PERSON) ? THIRD_PERSON : FIRST_PERSON;
-		printf("Camera switched to %s\n", currentCamera == FIRST_PERSON ? "First Person" : "Third Person");
-	}
-	else if (button == GLUT_MIDDLE_BUTTON && state == GLUT_DOWN)
-	{
-		// Middle button = Toggle mouse look on/off
-		mouseLookEnabled = !mouseLookEnabled;
-		if (mouseLookEnabled) {
-			glutSetCursor(GLUT_CURSOR_NONE); // Hide cursor
-			glutWarpPointer(centerX, centerY);
-			firstMouse = true;
-			printf("Mouse look enabled\n");
-		} else {
-			glutSetCursor(GLUT_CURSOR_INHERIT); // Show cursor
-			printf("Mouse look disabled\n");
-		}
-	}
-
-	glutPostRedisplay();
 }
 
 //=======================================================================
@@ -652,11 +558,6 @@ void myReshape(int w, int h)
 	if (h == 0) h = 1;
 	WIDTH = w;
 	HEIGHT = h;
-	
-	// Update center point for mouse look
-	centerX = WIDTH / 2;
-	centerY = HEIGHT / 2;
-	
 	glViewport(0, 0, w, h);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
@@ -801,18 +702,6 @@ void LoadAssets()
 //=======================================================================
 void myIdle(void)
 {
-	// Jump physics
-	if (isJumping) {
-		model_bmo.pos_y += jumpVelocity;
-		jumpVelocity -= gravity;
-		if (model_bmo.pos_y <= 0.0f) {
-			model_bmo.pos_y = 0.0f;
-			isJumping = false;
-			jumpVelocity = 0.0f;
-		}
-	}
-
-	// Cupcake rotation animation
 	cupcakeRotation += 1.0f;
 	if (cupcakeRotation >= 360.0f)
 		cupcakeRotation = 0.0f;
@@ -837,13 +726,8 @@ void main(int argc, char** argv)
 	glutSpecialFunc(mySpecialKeys);
 	glutIdleFunc(myIdle);
 	glutMotionFunc(myMotion);
-	glutPassiveMotionFunc(myPassiveMotion); // FPS-style mouse look
 	glutMouseFunc(myMouse);
 	glutReshapeFunc(myReshape);
-	
-	// Hide cursor for FPS experience
-	glutSetCursor(GLUT_CURSOR_NONE);
-	glutWarpPointer(centerX, centerY);
 
 	myInit();
 	printf("Init Done.\n");
