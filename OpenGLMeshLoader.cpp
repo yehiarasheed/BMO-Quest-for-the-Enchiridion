@@ -116,6 +116,7 @@ GLTexture tex_ground;
 GLTexture tex_bmo;
 GLTexture tex_cupcake;
 GLTexture tex_coin;
+GLTexture tex_finn;
 GLTexture tex_candy_cane;
 
 void CheckCoinCollision()
@@ -424,7 +425,19 @@ void myDisplay(void)
 		glPopMatrix();
 	}
 
+	// --- DRAW FINN ---
+	glPushMatrix();
+
+	glEnable(GL_TEXTURE_2D);
+	glColor3f(1.0f, 1.0f, 1.0f);
+
+	// Bind Finn's texture
+	glBindTexture(GL_TEXTURE_2D, tex_finn.texture[0]);
+
 	model_finn.Draw();
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glPopMatrix();
 
 	for (int i = 0; i < NUM_CUPCAKES; i++)
 	{
@@ -908,12 +921,25 @@ void LoadAssets()
 	printf("Loading OBJ Model: Finn...\n");
 	model_finn.Load("Models/finn/Finn.obj", "Models/finn/");
 
+	// 1. Load the Texture (Make sure "finn.bmp" exists in your Textures folder)
+	tex_finn.Load("Textures/finn.bmp");
+
+	// 2. Assign texture to materials
+	for (auto& entry : model_finn.materials) {
+		entry.second.tex = tex_finn;
+		entry.second.hasTexture = true;
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
+
 	model_finn.scale_xyz = 0.1f;
 	model_finn.pos_x = 70.0f;
 	model_finn.pos_y = 0.0f;
 	model_finn.pos_z = 53.0f;
 	model_finn.rot_y = -90.0f;
 
+	// 3. Generate Display List AFTER assigning texture
 	model_finn.GenerateDisplayList();
 	printf("Finn Ready.\n");
 
