@@ -374,7 +374,24 @@ void myDisplay(void)
 
 	if (currentCamera != FIRST_PERSON)
 	{
+		glPushMatrix();
+
+		// 1. Enable Texturing
+		glEnable(GL_TEXTURE_2D);
+
+		// 2. Reset color to white so the texture isn't dark or tinted
+		glColor3f(1.0f, 1.0f, 1.0f);
+
+		// 3. Force bind BMO's specific texture
+		glBindTexture(GL_TEXTURE_2D, tex_bmo.texture[0]);
+
+		// 4. Draw the model
 		model_bmo.Draw();
+
+		// 5. Unbind to stay safe
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+		glPopMatrix();
 	}
 
 	model_finn.Draw();
