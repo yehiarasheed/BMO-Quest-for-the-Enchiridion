@@ -17,7 +17,7 @@ char title[] = "3D Model Loader Sample";
 GLdouble fovy = 45.0;
 GLdouble aspectRatio = (GLdouble)WIDTH / (GLdouble)HEIGHT;
 GLdouble zNear = 0.1;
-GLdouble zFar = 100;
+GLdouble zFar = 1000; // Increased zFar slightly to accommodate larger map
 
 class Vector
 {
@@ -47,13 +47,14 @@ CameraMode currentCamera = THIRD_PERSON;
 Model_OBJ model_donut;
 Model_OBJ model_candy_kingdom;
 Model_OBJ model_bmo;
-Model_OBJ model_finn;
+Model_OBJ model_finn; 
 Model_OBJ model_cupcake;
 Model_OBJ model_coin;
 
 // --- JELLY VARIABLES ---
 Model_OBJ model_jelly;
 GLTexture tex_jelly;
+Model_OBJ model_lich; // Kept in case needed later, though unused currently
 
 // Cupcake array for collectibles
 const int NUM_CUPCAKES = 5;
@@ -126,8 +127,53 @@ void myInit(void)
 }
 
 //=======================================================================
-// Collision Detection Function
+// Render Ground Function
 //=======================================================================
+void RenderGround()
+{
+	glDisable(GL_LIGHTING);	// Disable lighting 
+
+	glColor3f(0.6, 0.6, 0.6);	// Dim the ground texture a bit
+
+	glEnable(GL_TEXTURE_2D);	// Enable 2D texturing
+
+	glBindTexture(GL_TEXTURE_2D, tex_ground.texture[0]);	// Bind the ground texture
+
+	glPushMatrix();
+	glBegin(GL_QUADS);
+	glNormal3f(0, 1, 0);	// Set quad normal direction.
+	glTexCoord2f(0, 0);		// Set tex coordinates ( Using (0,0) -> (5,5) with texture wrapping set to GL_REPEAT to simulate the ground repeated grass texture).
+	glVertex3f(-20, 0, -20);
+	glTexCoord2f(5, 0);
+	glVertex3f(20, 0, -20);
+	glTexCoord2f(5, 5);
+	glVertex3f(20, 0, 20);
+	glTexCoord2f(0, 5);
+	glVertex3f(-20, 0, 20);
+	glEnd();
+	glPopMatrix();
+
+	glEnable(GL_LIGHTING);	// Enable lighting again for other entites coming throung the pipeline.
+
+	glColor3f(1, 1, 1);	// Set material back to white instead of grey used for the ground texture.
+}
+
+//=======================================================================
+// Collision Detection Functions
+//=======================================================================
+bool CheckJellyCollision(float newX, float newZ)
+{	
+	float jellyRadius = 1.35f; // Collision radius matches jelly's actual visible size
+	
+	// Calculate distance between proposed BMO position and jelly
+	float dx = newX - model_jelly.pos_x;
+	float dz = newZ - model_jelly.pos_z;
+	float distance = sqrt(dx * dx + dz * dz);
+	
+	// Return true if collision detected
+	return (distance < jellyRadius);
+}
+
 void CheckCupcakeCollisions()
 {
 	for (int i = 0; i < NUM_CUPCAKES; i++)
@@ -211,7 +257,7 @@ void myDisplay(void)
 	model_coin.Draw();
 
 	// ============================================
-	// --- DRAW JELLY (FIXED) ---
+	// --- DRAW JELLY ---
 	// ============================================
 
 	glPushMatrix();
@@ -256,34 +302,68 @@ void myKeyboard(unsigned char button, int x, int y)
 	case 'c': case 'C':
 		currentCamera = (currentCamera == FIRST_PERSON) ? THIRD_PERSON : FIRST_PERSON;
 		break;
-	case 'i': case 'I':
-		model_bmo.pos_x += sin(angle) * moveSpeed;
-		model_bmo.pos_z -= cos(angle) * moveSpeed;
-		CheckCupcakeCollisions();
+	
+	// BMO movement (IJKL) - rotate BMO to face movement direction
+	case 'i':
+	case 'I':
+		// Move forward in current direction
+		{
+			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+			if (!CheckJellyCollision(newX, newZ)) {
+				model_bmo.pos_x = newX;
+				model_bmo.pos_z = newZ;
+				CheckCupcakeCollisions();
+			}
+		}
 		break;
-	case 'k': case 'K':
-		model_bmo.rot_y += 180.0f;
-		angle = model_bmo.rot_y * 3.14159 / 180.0;
-		model_bmo.pos_x += sin(angle) * moveSpeed;
-		model_bmo.pos_z -= cos(angle) * moveSpeed;
-		model_bmo.rot_y -= 180.0f;
-		CheckCupcakeCollisions();
+	case 'k':
+	case 'K':
+		// Move backward - rotate 180° to face backward, move, rotate back
+		{
+			model_bmo.rot_y += 180.0f;
+			angle = model_bmo.rot_y * 3.14159 / 180.0;
+			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+			model_bmo.rot_y -= 180.0f;
+			if (!CheckJellyCollision(newX, newZ)) {
+				model_bmo.pos_x = newX;
+				model_bmo.pos_z = newZ;
+				CheckCupcakeCollisions();
+			}
+		}
 		break;
-	case 'j': case 'J':
-		model_bmo.rot_y -= 90.0f;
-		angle = model_bmo.rot_y * 3.14159 / 180.0;
-		model_bmo.pos_x += sin(angle) * moveSpeed;
-		model_bmo.pos_z -= cos(angle) * moveSpeed;
-		model_bmo.rot_y += 90.0f;
-		CheckCupcakeCollisions();
+	case 'j':
+	case 'J':
+		// Move left - rotate 90° left, move forward, rotate back
+		{
+			model_bmo.rot_y -= 90.0f;
+			angle = model_bmo.rot_y * 3.14159 / 180.0;
+			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+			model_bmo.rot_y += 90.0f;
+			if (!CheckJellyCollision(newX, newZ)) {
+				model_bmo.pos_x = newX;
+				model_bmo.pos_z = newZ;
+				CheckCupcakeCollisions();
+			}
+		}
 		break;
-	case 'l': case 'L':
-		model_bmo.rot_y += 90.0f;
-		angle = model_bmo.rot_y * 3.14159 / 180.0;
-		model_bmo.pos_x += sin(angle) * moveSpeed;
-		model_bmo.pos_z -= cos(angle) * moveSpeed;
-		model_bmo.rot_y -= 90.0f;
-		CheckCupcakeCollisions();
+	case 'l':
+	case 'L':
+		// Move right - rotate 90° right, move forward, rotate back
+		{
+			model_bmo.rot_y += 90.0f;
+			angle = model_bmo.rot_y * 3.14159 / 180.0;
+			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+			model_bmo.rot_y -= 90.0f;
+			if (!CheckJellyCollision(newX, newZ)) {
+				model_bmo.pos_x = newX;
+				model_bmo.pos_z = newZ;
+				CheckCupcakeCollisions();
+			}
+		}
 		break;
 	case 'u': case 'U':
 		model_bmo.rot_y -= rotSpeed;
@@ -312,17 +392,31 @@ void mySpecialKeys(int key, int x, int y)
 	switch (key)
 	{
 	case GLUT_KEY_UP:
-		model_bmo.pos_x += sin(angle) * moveSpeed;
-		model_bmo.pos_z -= cos(angle) * moveSpeed;
-		CheckCupcakeCollisions();
+		// Move forward in current direction
+		{
+			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+			if (!CheckJellyCollision(newX, newZ)) {
+				model_bmo.pos_x = newX;
+				model_bmo.pos_z = newZ;
+				CheckCupcakeCollisions();
+			}
+		}
 		break;
 	case GLUT_KEY_DOWN:
-		model_bmo.rot_y += 180.0f;
-		angle = model_bmo.rot_y * 3.14159 / 180.0;
-		model_bmo.pos_x += sin(angle) * moveSpeed;
-		model_bmo.pos_z -= cos(angle) * moveSpeed;
-		model_bmo.rot_y -= 180.0f;
-		CheckCupcakeCollisions();
+		// Move backward - rotate 180°, move, rotate back
+		{
+			model_bmo.rot_y += 180.0f;
+			angle = model_bmo.rot_y * 3.14159 / 180.0;
+			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+			model_bmo.rot_y -= 180.0f;
+			if (!CheckJellyCollision(newX, newZ)) {
+				model_bmo.pos_x = newX;
+				model_bmo.pos_z = newZ;
+				CheckCupcakeCollisions();
+			}
+		}
 		break;
 	case GLUT_KEY_LEFT:
 		model_bmo.rot_y -= rotSpeed;
@@ -395,7 +489,7 @@ void LoadAssets()
 	// --- CANDY KINGDOM ---
 	printf("Loading OBJ Model: Candy Kingdom...\n");
 	model_candy_kingdom.Load("Models/candy/candyKingdom.obj", "Models/candy/");
-	model_candy_kingdom.scale_xyz = 200.0f;
+	model_candy_kingdom.scale_xyz = 300.0f;
 	printf("Candy Kingdom Loaded.\n");
 
 	// --- BMO ---
@@ -410,17 +504,23 @@ void LoadAssets()
 		entry.second.diffColor[2] = 1.0f;
 	}
 	model_bmo.GenerateDisplayList();
+
+	// Positioning - place BMO close to jelly and cupcakes
 	model_bmo.scale_xyz = 10.0f;
 	model_bmo.pos_x = 65.0f;
+	model_bmo.pos_z = 55.0f;
 	model_bmo.rot_y = -90.0f;
 	printf("BMO Ready.\n");
 
 	// --- CUPCAKE ---
 	printf("Loading OBJ Model: Cupcakes...\n");
 	tex_cupcake.Load("Textures/cupcake.bmp");
-	float cupcakeSpacing = 15.0f;
-	float startZ = 25.0f;
-
+	
+	// Create multiple cupcakes at different positions
+	// Using values from Main branch for larger map
+	float cupcakeSpacing = 15.0f; // Distance between cupcakes
+	float startZ = 60.0f;         // Start further out due to larger candy kingdom
+	
 	for (int i = 0; i < NUM_CUPCAKES; i++)
 	{
 		model_cupcakes[i].Load("Models/cupcake/cupcake.obj", "Models/cupcake/");
@@ -453,11 +553,14 @@ void LoadAssets()
 	// --- FINN ---
 	printf("Loading OBJ Model: Finn...\n");
 	model_finn.Load("Models/finn/Finn.obj", "Models/finn/");
+	
+	// Positioning - Using Main branch values
 	model_finn.scale_xyz = 0.1f;
-	model_finn.pos_x = 65.0f;
+	model_finn.pos_x = 70.0f;
 	model_finn.pos_y = 0.0f;
-	model_finn.pos_z = 8.0f;
-	model_finn.rot_y = -90.0f;
+	model_finn.pos_z = 53.0f; // Just in front of BMO, near jelly and cupcakes
+	model_finn.rot_y = -90.0f;   // Face same direction as BMO
+				
 	model_finn.GenerateDisplayList();
 	printf("Finn Ready.\n");
 
@@ -473,21 +576,20 @@ void LoadAssets()
 	printf("Donut Loaded.\n");
 
 	// ============================================
-	// --- LOAD JELLY (OBJ + TEXTURE) ---
+	// --- LOAD JELLY (COMBINED LOGIC) ---
 	// ============================================
 	printf("Loading OBJ Model: Jelly...\n");
 	tex_jelly.Load("Textures/jelly.bmp");
 
-	// --- DEBUG 1: DID TEXTURE LOAD? ---
 	printf("DEBUG: Texture ID = %d\n", tex_jelly.texture[0]);
 
 	model_jelly.Load("Models/jelly/jelly.obj", "Models/jelly/");
 
-	// --- DEBUG 2: ARE THERE MATERIALS? ---
 	printf("DEBUG: Materials Found = %d\n", model_jelly.materials.size());
 
+	// Use Texture logic from feat branch
 	for (auto& entry : model_jelly.materials) {
-		printf("DEBUG: Assigning texture to material...\n"); // Check if this prints
+		printf("DEBUG: Assigning texture to material...\n"); 
 		entry.second.tex = tex_jelly;
 		entry.second.hasTexture = true;
 		entry.second.diffColor[0] = 1.0f;
@@ -497,17 +599,17 @@ void LoadAssets()
 
 	model_jelly.GenerateDisplayList();
 
-	// Position
-	model_jelly.pos_x = 75.0f;
+	// Use Positioning from Main branch (larger map)
+	model_jelly.scale_xyz = 30.0f;
+	model_jelly.pos_x = 80.0f;  // To the right of cupcake row
+	model_jelly.pos_y = 0.0f;   // On the ground
+	model_jelly.pos_z = 50.0f;  // Adjusted for larger candy kingdom
 
-	// --- POSITION: 0.0f puts it on the ground ---
-	model_jelly.pos_y = 0.0f;
-	model_jelly.pos_z = 8.0f;
+	printf("Jelly Ready (Non-collidable obstacle).\n");
 
-	// --- SCALE: 40.0f ---
-	model_jelly.scale_xyz = 40.0f;
-
-	printf("Jelly Loaded.\n");
+	// --- OTHER TEXTURES ---
+	//tex_ground.Load("Textures/ground.bmp");
+	//loadBMP(&tex, "Textures/blu-sky-3.bmp", true);
 }
 
 //=======================================================================
