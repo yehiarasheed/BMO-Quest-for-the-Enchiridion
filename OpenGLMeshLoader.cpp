@@ -17,7 +17,7 @@ char title[] = "3D Model Loader Sample";
 GLdouble fovy = 45.0;
 GLdouble aspectRatio = (GLdouble)WIDTH / (GLdouble)HEIGHT;
 GLdouble zNear = 0.1;
-GLdouble zFar = 1000; // Increased zFar slightly to accommodate larger map
+GLdouble zFar = 1000;
 
 class Vector
 {
@@ -43,26 +43,44 @@ int cameraZoom = 0;
 enum CameraMode { FIRST_PERSON, THIRD_PERSON };
 CameraMode currentCamera = THIRD_PERSON;
 
+// Debugging Camera Height
+float cameraHeightOffset = 0.0f;
+
 // Model Variables
 Model_OBJ model_donut;
 Model_OBJ model_candy_kingdom;
 Model_OBJ model_bmo;
-Model_OBJ model_finn; 
+Model_OBJ model_finn;
 Model_OBJ model_cupcake;
-Model_OBJ model_coin;
 
 // --- JELLY VARIABLES ---
 Model_OBJ model_jelly;
 GLTexture tex_jelly;
-Model_OBJ model_lich; // Kept in case needed later, though unused currently
+Model_OBJ model_lich;
 
 // Cupcake array for collectibles
 const int NUM_CUPCAKES = 5;
 Model_OBJ model_cupcakes[NUM_CUPCAKES];
 bool cupcakeVisible[NUM_CUPCAKES];
 
+// --- COIN VARIABLES ---
+const int NUM_COINS = 5;
+Model_OBJ model_coins[NUM_COINS];
+bool coinVisible[NUM_COINS];
+
+// Coin Positions - SCATTERED AROUND THE JELLY (Center: 80, 0, 50)
+float coinPositions[NUM_COINS][3] = {
+	{ 80.0f, 2.0f, 65.0f },   // Front of Jelly
+	{ 95.0f, 2.0f, 50.0f },   // Right of Jelly
+	{ 80.0f, 2.0f, 35.0f },   // Back of Jelly
+	{ 65.0f, 2.0f, 50.0f },   // Left of Jelly
+	{ 80.0f, 8.0f, 50.0f }    // High above the Jelly!
+};
+
 // Animation variables
 float cupcakeRotation = 0.0f;
+float coinRotation = 0.0f;
+float coinBounceAngle = 0.0f; // For up/down movement
 
 // Collision detection radius
 float collisionRadius = 1.2f;
@@ -71,6 +89,7 @@ float collisionRadius = 1.2f;
 GLTexture tex_ground;
 GLTexture tex_bmo;
 GLTexture tex_cupcake;
+GLTexture tex_coin;
 
 //=======================================================================
 // Lighting Configuration Function
@@ -127,50 +146,14 @@ void myInit(void)
 }
 
 //=======================================================================
-// Render Ground Function
-//=======================================================================
-void RenderGround()
-{
-	glDisable(GL_LIGHTING);	// Disable lighting 
-
-	glColor3f(0.6, 0.6, 0.6);	// Dim the ground texture a bit
-
-	glEnable(GL_TEXTURE_2D);	// Enable 2D texturing
-
-	glBindTexture(GL_TEXTURE_2D, tex_ground.texture[0]);	// Bind the ground texture
-
-	glPushMatrix();
-	glBegin(GL_QUADS);
-	glNormal3f(0, 1, 0);	// Set quad normal direction.
-	glTexCoord2f(0, 0);		// Set tex coordinates ( Using (0,0) -> (5,5) with texture wrapping set to GL_REPEAT to simulate the ground repeated grass texture).
-	glVertex3f(-20, 0, -20);
-	glTexCoord2f(5, 0);
-	glVertex3f(20, 0, -20);
-	glTexCoord2f(5, 5);
-	glVertex3f(20, 0, 20);
-	glTexCoord2f(0, 5);
-	glVertex3f(-20, 0, 20);
-	glEnd();
-	glPopMatrix();
-
-	glEnable(GL_LIGHTING);	// Enable lighting again for other entites coming throung the pipeline.
-
-	glColor3f(1, 1, 1);	// Set material back to white instead of grey used for the ground texture.
-}
-
-//=======================================================================
 // Collision Detection Functions
 //=======================================================================
 bool CheckJellyCollision(float newX, float newZ)
-{	
-	float jellyRadius = 1.35f; // Collision radius matches jelly's actual visible size
-	
-	// Calculate distance between proposed BMO position and jelly
+{
+	float jellyRadius = 1.35f;
 	float dx = newX - model_jelly.pos_x;
 	float dz = newZ - model_jelly.pos_z;
 	float distance = sqrt(dx * dx + dz * dz);
-	
-	// Return true if collision detected
 	return (distance < jellyRadius);
 }
 
@@ -192,6 +175,30 @@ void CheckCupcakeCollisions()
 	}
 }
 
+// --- CHECK MULTIPLE COINS ---
+void CheckCoinCollision()
+{
+	float coinCollisionRadius = 3.0f; // Increased slightly for easier collection
+
+	for (int i = 0; i < NUM_COINS; i++)
+	{
+		if (!coinVisible[i]) continue;
+
+		float dx = model_bmo.pos_x - coinPositions[i][0];
+		// We ignore Y height difference for basic collection so you can catch the high one
+		// or you can require a jump if jumping was implemented. 
+		// For now, infinite vertical collision cylinder.
+		float dz = model_bmo.pos_z - coinPositions[i][2];
+		float distance = sqrt(dx * dx + dz * dz);
+
+		if (distance < coinCollisionRadius)
+		{
+			coinVisible[i] = false;
+			printf("Coin %d Collected! +10 Points\n", i + 1);
+		}
+	}
+}
+
 //=======================================================================
 // Display Function
 //=======================================================================
@@ -205,15 +212,16 @@ void myDisplay(void)
 	if (currentCamera == FIRST_PERSON)
 	{
 		gluLookAt(
-			model_bmo.pos_x, model_bmo.pos_y + 2.0f, model_bmo.pos_z,
-			model_bmo.pos_x + sin(model_bmo.rot_y * 3.14159 / 180.0), model_bmo.pos_y + 2.0f, model_bmo.pos_z - cos(model_bmo.rot_y * 3.14159 / 180.0),
+			model_bmo.pos_x, model_bmo.pos_y + 2.0f + cameraHeightOffset, model_bmo.pos_z,
+			model_bmo.pos_x + sin(model_bmo.rot_y * 3.14159 / 180.0), model_bmo.pos_y + 2.0f + cameraHeightOffset, model_bmo.pos_z - cos(model_bmo.rot_y * 3.14159 / 180.0),
 			0, 1, 0
 		);
 	}
 	else
 	{
 		float camDistance = 15.0f;
-		float camHeight = 8.0f;
+		float camHeight = 8.0f + cameraHeightOffset;
+
 		float angle = model_bmo.rot_y * 3.14159265f / 180.0f;
 		float forwardX = sinf(angle);
 		float forwardZ = -cosf(angle);
@@ -254,26 +262,56 @@ void myDisplay(void)
 		}
 	}
 
-	model_coin.Draw();
-
 	// ============================================
+	// --- DRAW MULTIPLE COINS ---
+	// ============================================
+
+	// Force Texture State for Coins
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, tex_coin.texture[0]);
+	glColor3f(1.0f, 1.0f, 1.0f);
+
+	for (int i = 0; i < NUM_COINS; i++)
+	{
+		if (coinVisible[i])
+		{
+			glPushMatrix();
+
+			// BOUNCE CALCULATION
+			float bounceHeight = 0.5f * sin(coinBounceAngle);
+
+			// Positions from Array
+			float ox = coinPositions[i][0];
+			float oy = coinPositions[i][1];
+			float oz = coinPositions[i][2];
+
+			// 1. Move to coin location + bounce
+			glTranslatef(ox, oy + bounceHeight, oz);
+
+			// 2. Rotate in place
+			glRotatef(coinRotation, 0.0f, 1.0f, 0.0f);
+
+			// 3. Draw Model at (0,0,0) relative to this new matrix
+			model_coins[i].pos_x = 0;
+			model_coins[i].pos_y = 0;
+			model_coins[i].pos_z = 0;
+
+			model_coins[i].Draw();
+
+			glPopMatrix();
+		}
+	}
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+
 	// --- DRAW JELLY ---
-	// ============================================
-
 	glPushMatrix();
-
-	// Apply texturing
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, tex_jelly.texture[0]);
 	glColor3f(1.0f, 1.0f, 1.0f);
-
-	// Draw the geometry (Scale and Position handled in LoadAssets)
 	model_jelly.Draw();
-
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glPopMatrix();
-
-	// ============================================
 
 	glPushMatrix();
 	model_donut.Draw();
@@ -302,69 +340,64 @@ void myKeyboard(unsigned char button, int x, int y)
 	case 'c': case 'C':
 		currentCamera = (currentCamera == FIRST_PERSON) ? THIRD_PERSON : FIRST_PERSON;
 		break;
-	
-	// BMO movement (IJKL) - rotate BMO to face movement direction
-	case 'i':
-	case 'I':
-		// Move forward in current direction
-		{
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-			}
+		// BMO movement
+	case 'i': case 'I':
+	{
+		float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+		float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+		if (!CheckJellyCollision(newX, newZ)) {
+			model_bmo.pos_x = newX;
+			model_bmo.pos_z = newZ;
+			CheckCupcakeCollisions();
+			CheckCoinCollision();
 		}
-		break;
-	case 'k':
-	case 'K':
-		// Move backward - rotate 180° to face backward, move, rotate back
-		{
-			model_bmo.rot_y += 180.0f;
-			angle = model_bmo.rot_y * 3.14159 / 180.0;
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			model_bmo.rot_y -= 180.0f;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-			}
+	}
+	break;
+	case 'k': case 'K':
+	{
+		model_bmo.rot_y += 180.0f;
+		angle = model_bmo.rot_y * 3.14159 / 180.0;
+		float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+		float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+		model_bmo.rot_y -= 180.0f;
+		if (!CheckJellyCollision(newX, newZ)) {
+			model_bmo.pos_x = newX;
+			model_bmo.pos_z = newZ;
+			CheckCupcakeCollisions();
+			CheckCoinCollision();
 		}
-		break;
-	case 'j':
-	case 'J':
-		// Move left - rotate 90° left, move forward, rotate back
-		{
-			model_bmo.rot_y -= 90.0f;
-			angle = model_bmo.rot_y * 3.14159 / 180.0;
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			model_bmo.rot_y += 90.0f;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-			}
+	}
+	break;
+	case 'j': case 'J':
+	{
+		model_bmo.rot_y -= 90.0f;
+		angle = model_bmo.rot_y * 3.14159 / 180.0;
+		float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+		float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+		model_bmo.rot_y += 90.0f;
+		if (!CheckJellyCollision(newX, newZ)) {
+			model_bmo.pos_x = newX;
+			model_bmo.pos_z = newZ;
+			CheckCupcakeCollisions();
+			CheckCoinCollision();
 		}
-		break;
-	case 'l':
-	case 'L':
-		// Move right - rotate 90° right, move forward, rotate back
-		{
-			model_bmo.rot_y += 90.0f;
-			angle = model_bmo.rot_y * 3.14159 / 180.0;
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			model_bmo.rot_y -= 90.0f;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-			}
+	}
+	break;
+	case 'l': case 'L':
+	{
+		model_bmo.rot_y += 90.0f;
+		angle = model_bmo.rot_y * 3.14159 / 180.0;
+		float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+		float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+		model_bmo.rot_y -= 90.0f;
+		if (!CheckJellyCollision(newX, newZ)) {
+			model_bmo.pos_x = newX;
+			model_bmo.pos_z = newZ;
+			CheckCupcakeCollisions();
+			CheckCoinCollision();
 		}
-		break;
+	}
+	break;
 	case 'u': case 'U':
 		model_bmo.rot_y -= rotSpeed;
 		break;
@@ -392,32 +425,32 @@ void mySpecialKeys(int key, int x, int y)
 	switch (key)
 	{
 	case GLUT_KEY_UP:
-		// Move forward in current direction
-		{
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-			}
+	{
+		float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+		float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+		if (!CheckJellyCollision(newX, newZ)) {
+			model_bmo.pos_x = newX;
+			model_bmo.pos_z = newZ;
+			CheckCupcakeCollisions();
+			CheckCoinCollision();
 		}
-		break;
+	}
+	break;
 	case GLUT_KEY_DOWN:
-		// Move backward - rotate 180°, move, rotate back
-		{
-			model_bmo.rot_y += 180.0f;
-			angle = model_bmo.rot_y * 3.14159 / 180.0;
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			model_bmo.rot_y -= 180.0f;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-			}
+	{
+		model_bmo.rot_y += 180.0f;
+		angle = model_bmo.rot_y * 3.14159 / 180.0;
+		float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+		float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+		model_bmo.rot_y -= 180.0f;
+		if (!CheckJellyCollision(newX, newZ)) {
+			model_bmo.pos_x = newX;
+			model_bmo.pos_z = newZ;
+			CheckCupcakeCollisions();
+			CheckCoinCollision();
 		}
-		break;
+	}
+	break;
 	case GLUT_KEY_LEFT:
 		model_bmo.rot_y -= rotSpeed;
 		break;
@@ -505,7 +538,6 @@ void LoadAssets()
 	}
 	model_bmo.GenerateDisplayList();
 
-	// Positioning - place BMO close to jelly and cupcakes
 	model_bmo.scale_xyz = 10.0f;
 	model_bmo.pos_x = 65.0f;
 	model_bmo.pos_z = 55.0f;
@@ -515,12 +547,10 @@ void LoadAssets()
 	// --- CUPCAKE ---
 	printf("Loading OBJ Model: Cupcakes...\n");
 	tex_cupcake.Load("Textures/cupcake.bmp");
-	
-	// Create multiple cupcakes at different positions
-	// Using values from Main branch for larger map
-	float cupcakeSpacing = 15.0f; // Distance between cupcakes
-	float startZ = 60.0f;         // Start further out due to larger candy kingdom
-	
+
+	float cupcakeSpacing = 15.0f;
+	float startZ = 60.0f;
+
 	for (int i = 0; i < NUM_CUPCAKES; i++)
 	{
 		model_cupcakes[i].Load("Models/cupcake/cupcake.obj", "Models/cupcake/");
@@ -540,27 +570,46 @@ void LoadAssets()
 	}
 	printf("All Cupcakes Ready.\n");
 
-	// --- COIN ---
-	printf("Loading OBJ Model: Coin...\n");
-	model_coin.Load("Models/coin/coin.obj", "Models/coin/");
-	model_coin.scale_xyz = 150.0f;
-	model_coin.pos_x = 65.0f;
-	model_coin.pos_y = 1.0f;
-	model_coin.pos_z = 12.0f;
-	model_coin.GenerateDisplayList();
-	printf("Coin Loaded.\n");
+	// --- COINS ---
+	printf("Loading OBJ Model: Coins...\n");
+	tex_coin.Load("Textures/coin.bmp");
+
+	// Load 5 instances
+	for (int i = 0; i < NUM_COINS; i++) {
+		model_coins[i].Load("Models/coin/coin.obj", "Models/coin/");
+
+		// Apply Texture
+		for (auto& entry : model_coins[i].materials) {
+			entry.second.tex = tex_coin;
+			entry.second.hasTexture = true;
+			entry.second.diffColor[0] = 1.0f;
+			entry.second.diffColor[1] = 1.0f;
+			entry.second.diffColor[2] = 1.0f;
+		}
+
+		model_coins[i].scale_xyz = 2.0f;
+
+		// Initial positions (doesn't affect display as display uses array)
+		model_coins[i].pos_x = coinPositions[i][0];
+		model_coins[i].pos_y = coinPositions[i][1];
+		model_coins[i].pos_z = coinPositions[i][2];
+
+		model_coins[i].GenerateDisplayList();
+
+		coinVisible[i] = true;
+	}
+	printf("Coins Loaded.\n");
 
 	// --- FINN ---
 	printf("Loading OBJ Model: Finn...\n");
 	model_finn.Load("Models/finn/Finn.obj", "Models/finn/");
-	
-	// Positioning - Using Main branch values
+
 	model_finn.scale_xyz = 0.1f;
 	model_finn.pos_x = 70.0f;
 	model_finn.pos_y = 0.0f;
-	model_finn.pos_z = 53.0f; // Just in front of BMO, near jelly and cupcakes
-	model_finn.rot_y = -90.0f;   // Face same direction as BMO
-				
+	model_finn.pos_z = 53.0f;
+	model_finn.rot_y = -90.0f;
+
 	model_finn.GenerateDisplayList();
 	printf("Finn Ready.\n");
 
@@ -575,40 +624,26 @@ void LoadAssets()
 	model_donut.GenerateDisplayList();
 	printf("Donut Loaded.\n");
 
-	// ============================================
-	// --- LOAD JELLY (COMBINED LOGIC) ---
-	// ============================================
+	// --- JELLY ---
 	printf("Loading OBJ Model: Jelly...\n");
 	tex_jelly.Load("Textures/jelly.bmp");
-
-	printf("DEBUG: Texture ID = %d\n", tex_jelly.texture[0]);
-
 	model_jelly.Load("Models/jelly/jelly.obj", "Models/jelly/");
 
-	// 2. We manually force the material to be ORANGE and disable any textures
-	//    that might be defined in the .mtl file (like the star texture).
 	for (auto& entry : model_jelly.materials) {
-		entry.second.hasTexture = false; // Disable the star texture
-
-		// Set RGB color to Orange
-		entry.second.diffColor[0] = 1.0f; // Red = 1.0
-		entry.second.diffColor[1] = 0.4f; // Green = 0.4 (Mixes to Orange)
-		entry.second.diffColor[2] = 0.1f; // Blue = 0.1
+		entry.second.hasTexture = false;
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 0.4f;
+		entry.second.diffColor[2] = 0.1f;
 	}
 
 	model_jelly.GenerateDisplayList();
 
-	// 3. Positioning (Using the larger map coordinates from Main)
 	model_jelly.scale_xyz = 30.0f;
 	model_jelly.pos_x = 80.0f;
 	model_jelly.pos_y = 0.0f;
 	model_jelly.pos_z = 50.0f;
 
-	printf("Jelly Loaded (Restored to Orange).\n");
-
-	// --- OTHER TEXTURES ---
-	//tex_ground.Load("Textures/ground.bmp");
-	//loadBMP(&tex, "Textures/blu-sky-3.bmp", true);
+	printf("Jelly Loaded.\n");
 }
 
 //=======================================================================
@@ -619,6 +654,14 @@ void myIdle(void)
 	cupcakeRotation += 1.0f;
 	if (cupcakeRotation >= 360.0f)
 		cupcakeRotation = 0.0f;
+
+	// SPIN THE COIN
+	coinRotation += 2.0f;
+	if (coinRotation >= 360.0f)
+		coinRotation = 0.0f;
+
+	// BOUNCE THE COIN
+	coinBounceAngle += 0.1f;
 
 	glutPostRedisplay();
 }
