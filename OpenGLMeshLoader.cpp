@@ -67,6 +67,13 @@ float cupcakeRotation = 0.0f;
 // Collision detection radius
 float collisionRadius = 1.2f;
 
+// Jump state and movement
+bool isJumping = false;
+float jumpVelocity = 0.0f;
+const float jumpStrength = 0.6f;
+const float gravity = 0.03f;
+
+
 // Textures
 GLTexture tex_ground;
 GLTexture tex_bmo;
@@ -192,6 +199,38 @@ void CheckCupcakeCollisions()
 	}
 }
 
+// Try to move BMO to new position; if collides with jelly, apply bounce
+bool TryMove(float newX, float newZ)
+{
+    if (CheckJellyCollision(newX, newZ))
+    {
+        // Bounce back from jelly
+        float dx = model_bmo.pos_x - model_jelly.pos_x;
+        float dz = model_bmo.pos_z - model_jelly.pos_z;
+        float len = sqrt(dx*dx + dz*dz);
+        float nx = 0.0f, nz = -1.0f;
+        if (len > 0.001f) { nx = dx / len; nz = dz / len; }
+
+        float pushBack = 2.0f;
+        model_bmo.pos_x = model_jelly.pos_x + nx * (pushBack + 1.0f);
+        model_bmo.pos_z = model_jelly.pos_z + nz * (pushBack + 1.0f);
+
+        // vertical bounce
+        if (!isJumping) {
+            isJumping = true;
+            jumpVelocity = jumpStrength * 0.9f;
+        } else if (jumpVelocity < 0.0f) {
+            jumpVelocity = jumpStrength * 1.8f;
+        }
+
+        return false;
+    }
+
+    model_bmo.pos_x = newX;
+    model_bmo.pos_z = newZ;
+    return true;
+}
+
 //=======================================================================
 // Display Function
 //=======================================================================
@@ -287,16 +326,19 @@ void myDisplay(void)
 //=======================================================================
 void myKeyboard(unsigned char button, int x, int y)
 {
-	float moveSpeed = 2.0f;
+    float moveSpeed = 2.0f;
 	float rotSpeed = 5.0f;
 	float angle = model_bmo.rot_y * 3.14159 / 180.0;
+    // Check for shift (sprint)
+    int mods = glutGetModifiers();
+    if (mods & GLUT_ACTIVE_SHIFT) moveSpeed *= 1.8f;
 
 	switch (button)
 	{
-	case 'w':
+	case 'z':
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		break;
-	case 'r':
+	case 'x':
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		break;
 	case 'c': case 'C':
@@ -304,21 +346,19 @@ void myKeyboard(unsigned char button, int x, int y)
 		break;
 	
 	// BMO movement (IJKL) - rotate BMO to face movement direction
-	case 'i':
-	case 'I':
+    case 'w':
+    case 'W':
 		// Move forward in current direction
 		{
 			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
 			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
+			if (TryMove(newX, newZ)) {
 				CheckCupcakeCollisions();
 			}
 		}
 		break;
-	case 'k':
-	case 'K':
+	case 's':
+    case 'S':
 		// Move backward - rotate 180° to face backward, move, rotate back
 		{
 			model_bmo.rot_y += 180.0f;
@@ -326,50 +366,54 @@ void myKeyboard(unsigned char button, int x, int y)
 			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
 			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
 			model_bmo.rot_y -= 180.0f;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
+			if (TryMove(newX, newZ)) {
 				CheckCupcakeCollisions();
 			}
 		}
 		break;
-	case 'j':
-	case 'J':
-		// Move left - rotate 90° left, move forward, rotate back
-		{
-			model_bmo.rot_y -= 90.0f;
-			angle = model_bmo.rot_y * 3.14159 / 180.0;
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			model_bmo.rot_y += 90.0f;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-			}
-		}
-		break;
-	case 'l':
-	case 'L':
-		// Move right - rotate 90° right, move forward, rotate back
-		{
-			model_bmo.rot_y += 90.0f;
-			angle = model_bmo.rot_y * 3.14159 / 180.0;
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			model_bmo.rot_y -= 90.0f;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-			}
-		}
-		break;
+    case 'a':
+    case 'A':
+        // Strafe left
+        {
+            float strafeAngle = model_bmo.rot_y - 90.0f;
+            float sAngle = strafeAngle * 3.14159 / 180.0;
+            float newX = model_bmo.pos_x + sin(sAngle) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(sAngle) * moveSpeed;
+            if (TryMove(newX, newZ)) {
+                CheckCupcakeCollisions();
+            }
+        }
+        break;
+    case 'd':
+    case 'D':
+        // Strafe right
+        {
+            float strafeAngle = model_bmo.rot_y + 90.0f;
+            float sAngle = strafeAngle * 3.14159 / 180.0;
+            float newX = model_bmo.pos_x + sin(sAngle) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(sAngle) * moveSpeed;
+            if (TryMove(newX, newZ)) {
+                CheckCupcakeCollisions();
+            }
+        }
+        break;
+    case ' ': // Space = jump
+        if (!isJumping) {
+            isJumping = true;
+            jumpVelocity = jumpStrength;
+        }
+        break;
 	case 'u': case 'U':
 		model_bmo.rot_y -= rotSpeed;
 		break;
 	case 'o': case 'O':
 		model_bmo.rot_y += rotSpeed;
+		break;
+	case 'p':
+	case 'P':
+		printf("BMO: pos=(%.2f, %.2f, %.2f) scale=%.2f rot=%.2f\n", model_bmo.pos_x, model_bmo.pos_y, model_bmo.pos_z, model_bmo.scale_xyz, model_bmo.rot_y);
+		printf("Finn: pos=(%.2f, %.2f, %.2f) scale=%.2f rot=%.2f\n", model_finn.pos_x, model_finn.pos_y, model_finn.pos_z, model_finn.scale_xyz, model_finn.rot_y);
+		printf("Jelly: pos=(%.2f, %.2f, %.2f) scale=%.2f\n", model_jelly.pos_x, model_jelly.pos_y, model_jelly.pos_z, model_jelly.scale_xyz);
 		break;
 	case 27:
 		exit(0);
@@ -385,45 +429,52 @@ void myKeyboard(unsigned char button, int x, int y)
 //=======================================================================
 void mySpecialKeys(int key, int x, int y)
 {
-	float moveSpeed = 2.0f;
+    float moveSpeed = 2.0f;
 	float rotSpeed = 5.0f;
 	float angle = model_bmo.rot_y * 3.14159 / 180.0;
+    int mods = glutGetModifiers();
+    if (mods & GLUT_ACTIVE_SHIFT) moveSpeed *= 1.8f;
 
 	switch (key)
 	{
-	case GLUT_KEY_UP:
-		// Move forward in current direction
-		{
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-			}
-		}
-		break;
-	case GLUT_KEY_DOWN:
-		// Move backward - rotate 180°, move, rotate back
-		{
-			model_bmo.rot_y += 180.0f;
-			angle = model_bmo.rot_y * 3.14159 / 180.0;
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			model_bmo.rot_y -= 180.0f;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-			}
-		}
-		break;
-	case GLUT_KEY_LEFT:
-		model_bmo.rot_y -= rotSpeed;
-		break;
-	case GLUT_KEY_RIGHT:
-		model_bmo.rot_y += rotSpeed;
-		break;
+    case GLUT_KEY_UP:
+        // Move forward
+        {
+            float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+            if (TryMove(newX, newZ)) CheckCupcakeCollisions();
+        }
+        break;
+    case GLUT_KEY_DOWN:
+        // Move backward
+        {
+            float backAngle = model_bmo.rot_y + 180.0f;
+            float a = backAngle * 3.14159 / 180.0;
+            float newX = model_bmo.pos_x + sin(a) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(a) * moveSpeed;
+            if (TryMove(newX, newZ)) CheckCupcakeCollisions();
+        }
+        break;
+    case GLUT_KEY_LEFT:
+        // Strafe left
+        {
+            float strafeAngle = model_bmo.rot_y - 90.0f;
+            float sAngle = strafeAngle * 3.14159 / 180.0;
+            float newX = model_bmo.pos_x + sin(sAngle) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(sAngle) * moveSpeed;
+            if (TryMove(newX, newZ)) CheckCupcakeCollisions();
+        }
+        break;
+    case GLUT_KEY_RIGHT:
+        // Strafe right
+        {
+            float strafeAngle = model_bmo.rot_y + 90.0f;
+            float sAngle = strafeAngle * 3.14159 / 180.0;
+            float newX = model_bmo.pos_x + sin(sAngle) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(sAngle) * moveSpeed;
+            if (TryMove(newX, newZ)) CheckCupcakeCollisions();
+        }
+        break;
 	}
 	glutPostRedisplay();
 }
@@ -616,7 +667,15 @@ void LoadAssets()
 //=======================================================================
 void myIdle(void)
 {
-	cupcakeRotation += 1.0f;
+	if (isJumping) {
+		model_bmo.pos_y += jumpVelocity;
+		jumpVelocity -= gravity;
+		if (model_bmo.pos_y <= 0.0f) {
+			model_bmo.pos_y = 0.0f;
+			isJumping = false;
+			jumpVelocity = 0.0f;
+		}
+	}
 	if (cupcakeRotation >= 360.0f)
 		cupcakeRotation = 0.0f;
 
