@@ -84,6 +84,9 @@ bool mouseLookEnabled = true;
 int centerX = WIDTH / 2;
 int centerY = HEIGHT / 2;
 bool firstMouse = true;
+// Camera pitch (vertical look)
+float cameraPitch = 0.0f; // degrees, positive = look up
+const float pitchLimit = 45.0f; // clamp up/down
 // Score
 int score = 0;
 bool coinVisible = true;
@@ -330,9 +333,15 @@ void myDisplay(void)
 
 	if (currentCamera == FIRST_PERSON)
 	{
+		// Compute forward vector from yaw (rot_y) and pitch (cameraPitch)
+		float yawRad = model_bmo.rot_y * 3.14159265f / 180.0f;
+		float pitchRad = cameraPitch * 3.14159265f / 180.0f;
+		float fx = sinf(yawRad) * cosf(pitchRad);
+		float fy = sinf(pitchRad);
+		float fz = -cosf(yawRad) * cosf(pitchRad);
 		gluLookAt(
 			model_bmo.pos_x, model_bmo.pos_y + 2.0f, model_bmo.pos_z,
-			model_bmo.pos_x + sin(model_bmo.rot_y * 3.14159 / 180.0), model_bmo.pos_y + 2.0f, model_bmo.pos_z - cos(model_bmo.rot_y * 3.14159 / 180.0),
+			model_bmo.pos_x + fx, model_bmo.pos_y + 2.0f + fy, model_bmo.pos_z + fz,
 			0, 1, 0
 		);
 	}
@@ -340,11 +349,14 @@ void myDisplay(void)
 	{
 		float camDistance = 15.0f;
 		float camHeight = 8.0f;
-		float angle = model_bmo.rot_y * 3.14159265f / 180.0f;
-		float forwardX = sinf(angle);
-		float forwardZ = -cosf(angle);
+		// Include pitch in third-person camera offset
+		float yawRad = model_bmo.rot_y * 3.14159265f / 180.0f;
+		float pitchRad = cameraPitch * 3.14159265f / 180.0f;
+		float forwardX = sinf(yawRad) * cosf(pitchRad);
+		float forwardY = sinf(pitchRad);
+		float forwardZ = -cosf(yawRad) * cosf(pitchRad);
 		float camX = model_bmo.pos_x - forwardX * camDistance;
-		float camY = model_bmo.pos_y + camHeight;
+		float camY = model_bmo.pos_y + camHeight + forwardY * camDistance;
 		float camZ = model_bmo.pos_z - forwardZ * camDistance;
 		float targetX = model_bmo.pos_x;
 		float targetY = model_bmo.pos_y + 2.0f;
@@ -412,105 +424,111 @@ void myDisplay(void)
 }
 
 //=======================================================================
-// Keyboard Function
+// Keyboard Function (WASD + Space Jump + Sprint)
 //=======================================================================
 void myKeyboard(unsigned char button, int x, int y)
 {
-	float moveSpeed = 2.0f;
-	float rotSpeed = 5.0f;
-	float angle = model_bmo.rot_y * 3.14159 / 180.0;
+    float moveSpeed = 2.0f;
+    float rotSpeed = 5.0f;
+    float angle = model_bmo.rot_y * 3.14159 / 180.0;
 
-	switch (button)
-	{
-	case 'w':
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		break;
-	case 'r':
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		break;
-	case 'c': case 'C':
-		currentCamera = (currentCamera == FIRST_PERSON) ? THIRD_PERSON : FIRST_PERSON;
-		break;
-	
-	// BMO movement (IJKL) - rotate BMO to face movement direction
-	case 'i':
-	case 'I':
-		// Move forward in current direction
-		{
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-				CheckCoinCollision();
-			}
-		}
-		break;
-	case 'k':
-	case 'K':
-		// Move backward - rotate 180° to face backward, move, rotate back
-		{
-			model_bmo.rot_y += 180.0f;
-			angle = model_bmo.rot_y * 3.14159 / 180.0;
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			model_bmo.rot_y -= 180.0f;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-				CheckCoinCollision();
-			}
-		}
-		break;
-	case 'j':
-	case 'J':
-		// Move left - rotate 90° left, move forward, rotate back
-		{
-			model_bmo.rot_y -= 90.0f;
-			angle = model_bmo.rot_y * 3.14159 / 180.0;
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			model_bmo.rot_y += 90.0f;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-				CheckCoinCollision();
-			}
-		}
-		break;
-	case 'l':
-	case 'L':
-		// Move right - rotate 90° right, move forward, rotate back
-		{
-			model_bmo.rot_y += 90.0f;
-			angle = model_bmo.rot_y * 3.14159 / 180.0;
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			model_bmo.rot_y -= 90.0f;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-				CheckCoinCollision();
-			}
-		}
-		break;
-	case 'u': case 'U':
-		model_bmo.rot_y -= rotSpeed;
-		break;
-	case 'o': case 'O':
-		model_bmo.rot_y += rotSpeed;
-		break;
-	case 27:
-		exit(0);
-		break;
-	default:
-		break;
-	}
-	glutPostRedisplay();
+    // Sprint when Shift is held
+    int mods = glutGetModifiers();
+    if (mods & GLUT_ACTIVE_SHIFT) moveSpeed *= 1.8f;
+
+    switch (button)
+    {
+    case 'z': case 'Z':
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        break;
+    case 'x': case 'X':
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        break;
+    case 'c': case 'C':
+        currentCamera = (currentCamera == FIRST_PERSON) ? THIRD_PERSON : FIRST_PERSON;
+        break;
+
+    // WASD controls
+    case 'w': case 'W':
+        {
+            float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+            if (TryMove(newX, newZ)) {
+                CheckCupcakeCollisions();
+                CheckCoinCollision();
+            }
+        }
+        break;
+    case 's': case 'S':
+        {
+            float backAngle = model_bmo.rot_y + 180.0f;
+            float a = backAngle * 3.14159 / 180.0;
+            float newX = model_bmo.pos_x + sin(a) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(a) * moveSpeed;
+            if (TryMove(newX, newZ)) {
+                CheckCupcakeCollisions();
+                CheckCoinCollision();
+            }
+        }
+        break;
+    case 'a': case 'A':
+        {
+            float strafeAngle = model_bmo.rot_y - 90.0f;
+            float sAngle = strafeAngle * 3.14159 / 180.0;
+            float newX = model_bmo.pos_x + sin(sAngle) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(sAngle) * moveSpeed;
+            if (TryMove(newX, newZ)) {
+                CheckCupcakeCollisions();
+                CheckCoinCollision();
+            }
+        }
+        break;
+    case 'd': case 'D':
+        {
+            float strafeAngle = model_bmo.rot_y + 90.0f;
+            float sAngle = strafeAngle * 3.14159 / 180.0;
+            float newX = model_bmo.pos_x + sin(sAngle) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(sAngle) * moveSpeed;
+            if (TryMove(newX, newZ)) {
+                CheckCupcakeCollisions();
+                CheckCoinCollision();
+            }
+        }
+        break;
+    case ' ': // Spacebar jump
+        if (!isJumping) {
+            isJumping = true;
+            jumpVelocity = jumpStrength;
+        }
+        break;
+    case 'u': case 'U':
+        model_bmo.rot_y -= rotSpeed;
+        break;
+    case 'o': case 'O':
+        model_bmo.rot_y += rotSpeed;
+        break;
+    case 'p': case 'P':
+        printf("BMO: pos=(%.2f, %.2f, %.2f) rot=%.2f\n", model_bmo.pos_x, model_bmo.pos_y, model_bmo.pos_z, model_bmo.rot_y);
+        printf("Score: %d\n", score);
+        break;
+    case 'q': case 'Q':
+        exit(0);
+        break;
+    case 27: // ESC
+        mouseLookEnabled = !mouseLookEnabled;
+        if (mouseLookEnabled) {
+            glutSetCursor(GLUT_CURSOR_NONE);
+            glutWarpPointer(centerX, centerY);
+            firstMouse = true;
+        } else {
+            glutSetCursor(GLUT_CURSOR_INHERIT);
+        }
+        break;
+    default:
+        break;
+    }
+
+    glutPostRedisplay();
 }
 
 //=======================================================================
@@ -521,46 +539,63 @@ void mySpecialKeys(int key, int x, int y)
 	float moveSpeed = 2.0f;
 	float rotSpeed = 5.0f;
 	float angle = model_bmo.rot_y * 3.14159 / 180.0;
+    // Treat arrows as movement (Up/Down = forward/backward, Left/Right = strafe)
+    // Check for Shift modifier (sprint)
+    int mods = glutGetModifiers();
+    if (mods & GLUT_ACTIVE_SHIFT) moveSpeed *= 1.8f;
 
-	switch (key)
-	{
-	case GLUT_KEY_UP:
-		// Move forward in current direction
-		{
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-				CheckCoinCollision();
-			}
-		}
-		break;
-	case GLUT_KEY_DOWN:
-		// Move backward - rotate 180°, move, rotate back
-		{
-			model_bmo.rot_y += 180.0f;
-			angle = model_bmo.rot_y * 3.14159 / 180.0;
-			float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
-			float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
-			model_bmo.rot_y -= 180.0f;
-			if (!CheckJellyCollision(newX, newZ)) {
-				model_bmo.pos_x = newX;
-				model_bmo.pos_z = newZ;
-				CheckCupcakeCollisions();
-				CheckCoinCollision();
-			}
-		}
-		break;
-	case GLUT_KEY_LEFT:
-		model_bmo.rot_y -= rotSpeed;
-		break;
-	case GLUT_KEY_RIGHT:
-		model_bmo.rot_y += rotSpeed;
-		break;
-	}
-	glutPostRedisplay();
+    switch (key)
+    {
+    case GLUT_KEY_UP:
+        {
+            float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(angle) * moveSpeed;
+            if (TryMove(newX, newZ)) {
+                CheckCupcakeCollisions();
+                CheckCoinCollision();
+            }
+        }
+        break;
+    case GLUT_KEY_DOWN:
+        {
+            float backAngle = model_bmo.rot_y + 180.0f;
+            float a = backAngle * 3.14159 / 180.0;
+            float newX = model_bmo.pos_x + sin(a) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(a) * moveSpeed;
+            if (TryMove(newX, newZ)) {
+                CheckCupcakeCollisions();
+                CheckCoinCollision();
+            }
+        }
+        break;
+    case GLUT_KEY_LEFT:
+        {
+            // Strafe left
+            float strafeAngle = model_bmo.rot_y - 90.0f;
+            float sAngle = strafeAngle * 3.14159 / 180.0;
+            float newX = model_bmo.pos_x + sin(sAngle) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(sAngle) * moveSpeed;
+            if (TryMove(newX, newZ)) {
+                CheckCupcakeCollisions();
+                CheckCoinCollision();
+            }
+        }
+        break;
+    case GLUT_KEY_RIGHT:
+        {
+            // Strafe right
+            float strafeAngle = model_bmo.rot_y + 90.0f;
+            float sAngle = strafeAngle * 3.14159 / 180.0;
+            float newX = model_bmo.pos_x + sin(sAngle) * moveSpeed;
+            float newZ = model_bmo.pos_z - cos(sAngle) * moveSpeed;
+            if (TryMove(newX, newZ)) {
+                CheckCupcakeCollisions();
+                CheckCoinCollision();
+            }
+        }
+        break;
+    }
+    glutPostRedisplay();
 }
 
 //=======================================================================
@@ -583,8 +618,12 @@ void myMotion(int x, int y)
 
 	// Only update if mouse moved significantly from center
 	if (abs(deltaX) > 1 || abs(deltaY) > 1) {
-		// Rotate BMO based on horizontal mouse movement
+		// Update yaw (horizontal)
 		model_bmo.rot_y -= deltaX * mouseSensitivity;
+		// Update pitch (vertical) and clamp
+		cameraPitch += -deltaY * mouseSensitivity; // moving mouse down -> look down
+		if (cameraPitch > pitchLimit) cameraPitch = pitchLimit;
+		if (cameraPitch < -pitchLimit) cameraPitch = -pitchLimit;
 
 		// Normalize rotation to 0-360 range
 		while (model_bmo.rot_y > 360.0f) model_bmo.rot_y -= 360.0f;
