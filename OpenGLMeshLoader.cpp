@@ -49,6 +49,7 @@ float cameraHeightOffset = 0.0f;
 // Model Variables
 Model_OBJ model_donut;
 Model_OBJ model_candy_kingdom;
+Model_OBJ model_candy_cane;
 Model_OBJ model_bmo;
 Model_OBJ model_finn;
 Model_OBJ model_cupcake;
@@ -115,6 +116,24 @@ GLTexture tex_ground;
 GLTexture tex_bmo;
 GLTexture tex_cupcake;
 GLTexture tex_coin;
+GLTexture tex_candy_cane;
+
+void CheckCoinCollision()
+{
+    if (!coinVisible) return;
+
+    float dx = model_bmo.pos_x - model_coin.pos_x;
+    float dz = model_bmo.pos_z - model_coin.pos_z;
+    float distance = sqrt(dx * dx + dz * dz);
+
+    if (distance < collisionRadius * 1.5f) // coin slightly easier to pick
+    {
+        coinVisible = false;
+        score += COIN_POINTS;
+        printf("Coin collected! Score: %d\n", score);
+    }
+}
+
 
 // Render HUD (score)
 void RenderHUD()
@@ -363,6 +382,25 @@ void myDisplay(void)
 	glLightfv(GL_LIGHT0, GL_AMBIENT, lightIntensity);
 
 	model_candy_kingdom.Draw();
+
+	// Draw candy cane model if available
+	// --- DRAW CANDY CANE ---
+	glPushMatrix();
+	// Ensure 2D texturing is on
+	glEnable(GL_TEXTURE_2D);
+
+	// Reset color to pure white so the texture isn't tinted
+	glColor3f(1.0f, 1.0f, 1.0f);
+
+	// Explicitly bind the candy cane texture
+	glBindTexture(GL_TEXTURE_2D, tex_candy_cane.texture[0]);
+
+	// Draw the model
+	model_candy_cane.Draw();
+
+	// Clean up
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glPopMatrix();
 
 	if (currentCamera != FIRST_PERSON)
 	{
@@ -756,6 +794,40 @@ void LoadAssets()
 	model_candy_kingdom.Load("Models/candy/candyKingdom.obj", "Models/candy/");
 	model_candy_kingdom.scale_xyz = 300.0f;
 	printf("Candy Kingdom Loaded.\n");
+
+	// --- CANDY CANE ---
+	printf("Loading OBJ Model: Candy Cane...\n");
+	model_candy_cane.Load("Models/candycane/Candy_Cane.obj", "Models/candycane/");
+	// Load texture FIRST
+	tex_candy_cane.Load("Textures/candy-cane.bmp");
+	printf("Candy cane texture ID: %d\n", tex_candy_cane.texture[0]);
+	printf("Candy cane UV count: %zu, material count: %zu\n", model_candy_cane.uvs.size(), model_candy_cane.materials.size());
+	
+	// Apply texture to materials
+	for (auto& entry : model_candy_cane.materials) {
+		entry.second.tex = tex_candy_cane;
+		entry.second.hasTexture = true;
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
+	
+	// Debug: list materials
+	for (auto& pair : model_candy_cane.materials) {
+		printf("Candy cane material '%s' hasTexture=%d texID=%d\n",
+			pair.first.c_str(), pair.second.hasTexture ? 1 : 0, pair.second.tex.texture[0]);
+	}
+	
+	// IMPORTANT: Regenerate display list AFTER assigning textures
+	model_candy_cane.GenerateDisplayList();
+	
+	// Set transform
+	model_candy_cane.scale_xyz = 1.5f;
+	model_candy_cane.pos_x = 72.0f;
+	model_candy_cane.pos_y = 0.0f;
+	model_candy_cane.pos_z = 58.0f;
+	model_candy_cane.rot_y = 0.0f;
+	printf("Candy Cane Loaded.\n");
 
 	// --- BMO ---
 	printf("Loading OBJ Model: BMO...\n");

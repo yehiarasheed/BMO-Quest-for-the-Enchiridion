@@ -243,12 +243,15 @@ public:
         for (size_t i = 0; i < groups.size(); i++) {
             ObjGroup& g = groups[i];
 
+            bool useAutoUV = false;
             if (materials.count(g.materialName)) {
                 ObjMaterial& mat = materials[g.materialName];
                 if (mat.hasTexture) {
                     glEnable(GL_TEXTURE_2D);
                     glColor3f(1, 1, 1);
                     glBindTexture(GL_TEXTURE_2D, mat.tex.texture[0]);
+                    // If material claims a texture but geometry has no UVs, we'll generate simple planar UVs
+                    if (g.uvIndices.empty()) useAutoUV = true;
                 }
                 else {
                     glDisable(GL_TEXTURE_2D);
@@ -272,10 +275,20 @@ public:
                     ObjNormal& n = normals[g.nIndices[k]];
                     glNormal3f(n.x, n.y, n.z);
                 }
-                // Apply UVs
-                if (k < g.uvIndices.size() && g.uvIndices[k] < uvs.size()) {
-                    ObjTexCoord& u = uvs[g.uvIndices[k]];
-                    glTexCoord2f(u.u, u.v);
+                // Apply UVs (use provided UVs if available, otherwise fallback to planar mapping)
+                if (!useAutoUV) {
+                    if (k < g.uvIndices.size() && g.uvIndices[k] < uvs.size()) {
+                        ObjTexCoord& u = uvs[g.uvIndices[k]];
+                        glTexCoord2f(u.u, u.v);
+                    }
+                } else {
+                    // planar mapping using X,Z world coords (may need scaling)
+                    if (g.vIndices[k] < vertices.size()) {
+                        ObjVector& v = vertices[g.vIndices[k]];
+                        float tu = v.x * 0.1f;
+                        float tv = v.z * 0.1f;
+                        glTexCoord2f(tu, tv);
+                    }
                 }
                 // Apply Vertex
                 if (g.vIndices[k] < vertices.size()) {
