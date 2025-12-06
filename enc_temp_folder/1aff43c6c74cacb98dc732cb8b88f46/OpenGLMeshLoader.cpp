@@ -70,8 +70,8 @@ float collisionRadius = 1.2f;
 // Score
 int score = 0;
 bool coinVisible = true;
-const int CUPCAKE_POINTS = 10;
-const int COIN_POINTS = 5;
+const int CUPCAKE_POINTS = 100;
+const int COIN_POINTS = 20;
 
 // Textures
 GLTexture tex_ground;
@@ -331,7 +331,7 @@ void myDisplay(void)
 		}
 	}
 
-	model_coin.Draw();
+    if (coinVisible) model_coin.Draw();
 
 	// ============================================
 	// --- DRAW JELLY ---
