@@ -66,7 +66,7 @@ public:
         ObjGroup currentGroup;
         currentGroup.materialName = "default";
 
-        char lineHeader[128];
+        char lineHeader[1024];
         int res;
         int lineCount = 0;
 
@@ -225,7 +225,7 @@ public:
                 materials[currentMtl].diffColor[2] = b;
             }
             else if (strcmp(lineHeader, "map_Kd") == 0) {
-                char texName[128];
+                char texName[1024];
                 fscanf(file, "%s\n", texName);
                 std::string fullPath = std::string(pathPrefix) + texName;
                 materials[currentMtl].tex.Load((char*)fullPath.c_str());
