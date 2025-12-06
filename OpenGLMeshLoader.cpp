@@ -375,7 +375,23 @@ void myDisplay(void)
 	model_candy_kingdom.Draw();
 
 	// Draw candy cane model if available
+	// --- DRAW CANDY CANE ---
+	glPushMatrix();
+	// Ensure 2D texturing is on
+	glEnable(GL_TEXTURE_2D);
+
+	// Reset color to pure white so the texture isn't tinted
+	glColor3f(1.0f, 1.0f, 1.0f);
+
+	// Explicitly bind the candy cane texture
+	glBindTexture(GL_TEXTURE_2D, tex_candy_cane.texture[0]);
+
+	// Draw the model
 	model_candy_cane.Draw();
+
+	// Clean up
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glPopMatrix();
 
 	if (currentCamera != FIRST_PERSON)
 	{
