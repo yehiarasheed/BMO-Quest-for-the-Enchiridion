@@ -585,27 +585,26 @@ void LoadAssets()
 
 	model_jelly.Load("Models/jelly/jelly.obj", "Models/jelly/");
 
-	printf("DEBUG: Materials Found = %d\n", model_jelly.materials.size());
-
-	// Use Texture logic from feat branch
+	// 2. We manually force the material to be ORANGE and disable any textures
+	//    that might be defined in the .mtl file (like the star texture).
 	for (auto& entry : model_jelly.materials) {
-		printf("DEBUG: Assigning texture to material...\n"); 
-		entry.second.tex = tex_jelly;
-		entry.second.hasTexture = true;
-		entry.second.diffColor[0] = 1.0f;
-		entry.second.diffColor[1] = 1.0f;
-		entry.second.diffColor[2] = 1.0f;
+		entry.second.hasTexture = false; // Disable the star texture
+
+		// Set RGB color to Orange
+		entry.second.diffColor[0] = 1.0f; // Red = 1.0
+		entry.second.diffColor[1] = 0.4f; // Green = 0.4 (Mixes to Orange)
+		entry.second.diffColor[2] = 0.1f; // Blue = 0.1
 	}
 
 	model_jelly.GenerateDisplayList();
 
-	// Use Positioning from Main branch (larger map)
+	// 3. Positioning (Using the larger map coordinates from Main)
 	model_jelly.scale_xyz = 30.0f;
-	model_jelly.pos_x = 80.0f;  // To the right of cupcake row
-	model_jelly.pos_y = 0.0f;   // On the ground
-	model_jelly.pos_z = 50.0f;  // Adjusted for larger candy kingdom
+	model_jelly.pos_x = 80.0f;
+	model_jelly.pos_y = 0.0f;
+	model_jelly.pos_z = 50.0f;
 
-	printf("Jelly Ready (Non-collidable obstacle).\n");
+	printf("Jelly Loaded (Restored to Orange).\n");
 
 	// --- OTHER TEXTURES ---
 	//tex_ground.Load("Textures/ground.bmp");
