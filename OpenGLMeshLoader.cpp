@@ -6,6 +6,7 @@
 #include <glut.h>
 #include <math.h>
 #include <stdio.h>
+#include <string>
 
 int WIDTH = 1280;
 int HEIGHT = 720;
@@ -47,7 +48,6 @@ CameraMode currentCamera = THIRD_PERSON;
 float cameraHeightOffset = 0.0f;
 
 // Model Variables
-Model_OBJ model_donut;
 Model_OBJ model_candy_kingdom;
 Model_OBJ model_candy_cane;
 Model_OBJ model_bmo;
@@ -57,7 +57,12 @@ Model_OBJ model_cupcake;
 // --- JELLY VARIABLES ---
 Model_OBJ model_jelly;
 GLTexture tex_jelly;
-Model_OBJ model_lich;
+
+// --- DONUT VARIABLES ---
+Model_OBJ model_donut;
+GLTexture tex_donut;
+// Animation for Donut
+float donutShakeAngle = 0.0f;
 
 // Cupcake array for collectibles
 const int NUM_CUPCAKES = 5;
@@ -68,20 +73,21 @@ bool cupcakeVisible[NUM_CUPCAKES];
 const int NUM_COINS = 5;
 Model_OBJ model_coins[NUM_COINS];
 bool coinVisible[NUM_COINS];
+Model_OBJ model_coin;
 
-// Coin Positions - SCATTERED AROUND THE JELLY (Center: 80, 0, 50)
+// Coin Positions
 float coinPositions[NUM_COINS][3] = {
-	{ 80.0f, 2.0f, 65.0f },   // Front of Jelly
-	{ 95.0f, 2.0f, 50.0f },   // Right of Jelly
-	{ 80.0f, 2.0f, 35.0f },   // Back of Jelly
-	{ 65.0f, 2.0f, 50.0f },   // Left of Jelly
-	{ 80.0f, 8.0f, 50.0f }    // High above the Jelly!
+	{ 80.0f, 2.0f, 65.0f },
+	{ 95.0f, 2.0f, 50.0f },
+	{ 80.0f, 2.0f, 35.0f },
+	{ 65.0f, 2.0f, 50.0f },
+	{ 80.0f, 8.0f, 50.0f }
 };
 
 // Animation variables
 float cupcakeRotation = 0.0f;
 float coinRotation = 0.0f;
-float coinBounceAngle = 0.0f; // For up/down movement
+float coinBounceAngle = 0.0f;
 
 // Collision detection radius
 float collisionRadius = 1.2f;
@@ -104,8 +110,8 @@ int centerX = WIDTH / 2;
 int centerY = HEIGHT / 2;
 bool firstMouse = true;
 // Camera pitch (vertical look)
-float cameraPitch = 0.0f; // degrees, positive = look up
-const float pitchLimit = 45.0f; // clamp up/down
+float cameraPitch = 0.0f;
+const float pitchLimit = 45.0f;
 // Score
 int score = 0;
 const int CUPCAKE_POINTS = 10;
@@ -119,27 +125,9 @@ GLTexture tex_coin;
 GLTexture tex_finn;
 GLTexture tex_candy_cane;
 
-void CheckCoinCollision()
-{
-    if (!coinVisible) return;
-
-    float dx = model_bmo.pos_x - model_coin.pos_x;
-    float dz = model_bmo.pos_z - model_coin.pos_z;
-    float distance = sqrt(dx * dx + dz * dz);
-
-    if (distance < collisionRadius * 1.5f) // coin slightly easier to pick
-    {
-        coinVisible = false;
-        score += COIN_POINTS;
-        printf("Coin collected! Score: %d\n", score);
-    }
-}
-
-
 // Render HUD (score)
 void RenderHUD()
 {
-	// Save matrices
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 	glLoadIdentity();
@@ -149,7 +137,6 @@ void RenderHUD()
 	glPushMatrix();
 	glLoadIdentity();
 
-	// Draw background box
 	int boxW = 220;
 	int boxH = 40;
 	int margin = 10;
@@ -159,7 +146,6 @@ void RenderHUD()
 	glDisable(GL_LIGHTING);
 	glDisable(GL_DEPTH_TEST);
 
-	// semi-transparent background
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glColor4f(0.0f, 0.0f, 0.0f, 0.5f);
@@ -171,16 +157,13 @@ void RenderHUD()
 	glEnd();
 	glDisable(GL_BLEND);
 
-	// Draw score text
 	char buf[64];
 	sprintf(buf, "Score: %d", score);
-	// white text
 	glColor3f(1.0f, 1.0f, 1.0f);
 	glRasterPos2i(x + 12, y + 12);
 	for (char* c = buf; *c != '\0'; ++c)
 		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
 
-	// restore states
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
 
@@ -190,9 +173,6 @@ void RenderHUD()
 	glPopMatrix();
 }
 
-//=======================================================================
-// Lighting Configuration Function
-//=======================================================================
 void InitLightSource()
 {
 	glEnable(GL_LIGHTING);
@@ -211,9 +191,6 @@ void InitLightSource()
 	glLightfv(GL_LIGHT0, GL_POSITION, light_position);
 }
 
-//=======================================================================
-// Material Configuration Function
-//======================================================================
 void InitMaterial()
 {
 	glEnable(GL_COLOR_MATERIAL);
@@ -226,9 +203,6 @@ void InitMaterial()
 	glMaterialfv(GL_FRONT, GL_SHININESS, shininess);
 }
 
-//=======================================================================
-// OpengGL Configuration Function
-//=======================================================================
 void myInit(void)
 {
 	glClearColor(0.0, 0.0, 0.0, 0.0);
@@ -244,9 +218,6 @@ void myInit(void)
 	glEnable(GL_NORMALIZE);
 }
 
-//=======================================================================
-// Collision Detection Functions
-//=======================================================================
 bool CheckJellyCollision(float newX, float newZ)
 {
 	float jellyRadius = 1.35f;
@@ -254,6 +225,16 @@ bool CheckJellyCollision(float newX, float newZ)
 	float dz = newZ - model_jelly.pos_z;
 	float distance = sqrt(dx * dx + dz * dz);
 	return (distance < jellyRadius);
+}
+
+// --- DONUT OBSTACLE LOGIC ---
+bool CheckDonutCollision(float newX, float newZ)
+{
+	float donutRadius = 2.0f; // Radius for collision
+	float dx = newX - model_donut.pos_x;
+	float dz = newZ - model_donut.pos_z;
+	float distance = sqrt(dx * dx + dz * dz);
+	return (distance < donutRadius);
 }
 
 void CheckCupcakeCollisions()
@@ -269,25 +250,21 @@ void CheckCupcakeCollisions()
 		if (distance < collisionRadius)
 		{
 			cupcakeVisible[i] = false;
-			score += CUPCAKE_POINTS; // cupcakes worth more
+			score += CUPCAKE_POINTS;
 			printf("Cupcake %d collected! Score: %d\n", i + 1, score);
 		}
 	}
 }
 
-// --- CHECK MULTIPLE COINS ---
 void CheckCoinCollision()
 {
-	float coinCollisionRadius = 3.0f; // Increased slightly for easier collection
+	float coinCollisionRadius = 3.0f;
 
 	for (int i = 0; i < NUM_COINS; i++)
 	{
 		if (!coinVisible[i]) continue;
 
 		float dx = model_bmo.pos_x - coinPositions[i][0];
-		// We ignore Y height difference for basic collection so you can catch the high one
-		// or you can require a jump if jumping was implemented. 
-		// For now, infinite vertical collision cylinder.
 		float dz = model_bmo.pos_z - coinPositions[i][2];
 		float distance = sqrt(dx * dx + dz * dz);
 
@@ -300,12 +277,11 @@ void CheckCoinCollision()
 	}
 }
 
-// Try to move BMO to new position; if collides with jelly, apply bounce
 bool TryMove(float newX, float newZ)
 {
+	// 1. Check Jelly Obstacle
 	if (CheckJellyCollision(newX, newZ))
 	{
-		// Bounce back from jelly
 		float dx = model_bmo.pos_x - model_jelly.pos_x;
 		float dz = model_bmo.pos_z - model_jelly.pos_z;
 		float len = sqrt(dx * dx + dz * dz);
@@ -316,7 +292,6 @@ bool TryMove(float newX, float newZ)
 		model_bmo.pos_x = model_jelly.pos_x + nx * (pushBack + 1.0f);
 		model_bmo.pos_z = model_jelly.pos_z + nz * (pushBack + 1.0f);
 
-		// vertical bounce
 		if (!isJumping) {
 			isJumping = true;
 			jumpVelocity = jumpStrength * 0.9f;
@@ -324,7 +299,31 @@ bool TryMove(float newX, float newZ)
 		else if (jumpVelocity < 0.0f) {
 			jumpVelocity = jumpStrength * 1.8f;
 		}
+		return false;
+	}
 
+	// 2. Check Donut Obstacle (Similar bounce logic)
+	if (CheckDonutCollision(newX, newZ))
+	{
+		float dx = model_bmo.pos_x - model_donut.pos_x;
+		float dz = model_bmo.pos_z - model_donut.pos_z;
+		float len = sqrt(dx * dx + dz * dz);
+		float nx = 0.0f, nz = -1.0f;
+		if (len > 0.001f) { nx = dx / len; nz = dz / len; }
+
+		float pushBack = 2.5f; // Push slightly harder than jelly
+		model_bmo.pos_x = model_donut.pos_x + nx * (pushBack + 1.5f);
+		model_bmo.pos_z = model_donut.pos_z + nz * (pushBack + 1.5f);
+
+		// Bounce the player up
+		if (!isJumping) {
+			isJumping = true;
+			jumpVelocity = jumpStrength * 0.9f;
+		}
+		else if (jumpVelocity < 0.0f) {
+			jumpVelocity = jumpStrength * 1.8f;
+		}
+		printf("Bonk! You hit the Donut.\n");
 		return false;
 	}
 
@@ -333,9 +332,6 @@ bool TryMove(float newX, float newZ)
 	return true;
 }
 
-//=======================================================================
-// Display Function
-//=======================================================================
 void myDisplay(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -345,7 +341,6 @@ void myDisplay(void)
 
 	if (currentCamera == FIRST_PERSON)
 	{
-		// Compute forward vector from yaw (rot_y) and pitch (cameraPitch)
 		float yawRad = model_bmo.rot_y * 3.14159265f / 180.0f;
 		float pitchRad = cameraPitch * 3.14159265f / 180.0f;
 		float fx = sinf(yawRad) * cosf(pitchRad);
@@ -361,7 +356,6 @@ void myDisplay(void)
 	{
 		float camDistance = 15.0f;
 		float camHeight = 8.0f;
-		// Include pitch in third-person camera offset
 		float yawRad = model_bmo.rot_y * 3.14159265f / 180.0f;
 		float pitchRad = cameraPitch * 3.14159265f / 180.0f;
 		float forwardX = sinf(yawRad) * cosf(pitchRad);
@@ -384,61 +378,37 @@ void myDisplay(void)
 
 	model_candy_kingdom.Draw();
 
-	// Draw candy cane model if available
-	// --- DRAW CANDY CANE ---
+	// Candy Cane
 	glPushMatrix();
-	// Ensure 2D texturing is on
 	glEnable(GL_TEXTURE_2D);
-
-	// Reset color to pure white so the texture isn't tinted
 	glColor3f(1.0f, 1.0f, 1.0f);
-
-	// Explicitly bind the candy cane texture
 	glBindTexture(GL_TEXTURE_2D, tex_candy_cane.texture[0]);
-
-	// Draw the model
 	model_candy_cane.Draw();
-
-	// Clean up
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glPopMatrix();
 
+	// BMO
 	if (currentCamera != FIRST_PERSON)
 	{
 		glPushMatrix();
-
-		// 1. Enable Texturing
 		glEnable(GL_TEXTURE_2D);
-
-		// 2. Reset color to white so the texture isn't dark or tinted
 		glColor3f(1.0f, 1.0f, 1.0f);
-
-		// 3. Force bind BMO's specific texture
 		glBindTexture(GL_TEXTURE_2D, tex_bmo.texture[0]);
-
-		// 4. Draw the model
 		model_bmo.Draw();
-
-		// 5. Unbind to stay safe
 		glBindTexture(GL_TEXTURE_2D, 0);
-
 		glPopMatrix();
 	}
 
-	// --- DRAW FINN ---
+	// Finn
 	glPushMatrix();
-
 	glEnable(GL_TEXTURE_2D);
 	glColor3f(1.0f, 1.0f, 1.0f);
-
-	// Bind Finn's texture
 	glBindTexture(GL_TEXTURE_2D, tex_finn.texture[0]);
-
 	model_finn.Draw();
-
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glPopMatrix();
 
+	// Cupcakes
 	for (int i = 0; i < NUM_CUPCAKES; i++)
 	{
 		if (cupcakeVisible[i])
@@ -452,11 +422,41 @@ void myDisplay(void)
 		}
 	}
 
-	// ============================================
-	// --- DRAW MULTIPLE COINS ---
-	// ============================================
+	// --- DRAW DONUT (OBSTACLE + ANIMATED) ---
+	glPushMatrix();
+	glColor3f(1.0f, 1.0f, 1.0f);
 
-	// Force Texture State for Coins
+	// Calculate animation offsets
+	float donutBounce = 0.3f * sin(donutShakeAngle);
+	float donutWiggle = 5.0f * cos(donutShakeAngle * 2.0f);
+
+	// Backup original coordinates
+	float ox = model_donut.pos_x;
+	float oy = model_donut.pos_y;
+	float oz = model_donut.pos_z;
+
+	// Apply Transformations relative to where the donut SHOULD be
+	glTranslatef(ox, oy + donutBounce, oz);
+	glRotatef(model_donut.rot_y, 0, 1, 0); // Original rotation
+	glRotatef(donutWiggle, 0, 0, 1);       // Wiggle on Z axis (shake side to side)
+
+	// Zero out model internal coords so Draw() happens at (0,0,0) local to the transformation
+	model_donut.pos_x = 0;
+	model_donut.pos_y = 0;
+	model_donut.pos_z = 0;
+	model_donut.rot_y = 0;
+
+	model_donut.Draw();
+
+	// Restore original coordinates for collision logic
+	model_donut.pos_x = ox;
+	model_donut.pos_y = oy;
+	model_donut.pos_z = oz;
+	model_donut.rot_y = 45.0f; // Original rotation value
+
+	glPopMatrix();
+
+	// Coins
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, tex_coin.texture[0]);
 	glColor3f(1.0f, 1.0f, 1.0f);
@@ -466,35 +466,22 @@ void myDisplay(void)
 		if (coinVisible[i])
 		{
 			glPushMatrix();
-
-			// BOUNCE CALCULATION
 			float bounceHeight = 0.5f * sin(coinBounceAngle);
-
-			// Positions from Array
 			float ox = coinPositions[i][0];
 			float oy = coinPositions[i][1];
 			float oz = coinPositions[i][2];
-
-			// 1. Move to coin location + bounce
 			glTranslatef(ox, oy + bounceHeight, oz);
-
-			// 2. Rotate in place
 			glRotatef(coinRotation, 0.0f, 1.0f, 0.0f);
-
-			// 3. Draw Model at (0,0,0) relative to this new matrix
 			model_coins[i].pos_x = 0;
 			model_coins[i].pos_y = 0;
 			model_coins[i].pos_z = 0;
-
 			model_coins[i].Draw();
-
 			glPopMatrix();
 		}
 	}
-
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	// --- DRAW JELLY ---
+	// Jelly
 	glPushMatrix();
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, tex_jelly.texture[0]);
@@ -503,26 +490,16 @@ void myDisplay(void)
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glPopMatrix();
 
-	glPushMatrix();
-	model_donut.Draw();
-	glPopMatrix();
-
-	// Draw HUD on top
 	RenderHUD();
-
 	glutSwapBuffers();
 }
 
-//=======================================================================
-// Keyboard Function (WASD + Space Jump + Sprint)
-//=======================================================================
 void myKeyboard(unsigned char button, int x, int y)
 {
 	float moveSpeed = 2.0f;
 	float rotSpeed = 5.0f;
 	float angle = model_bmo.rot_y * 3.14159 / 180.0;
 
-	// Sprint when Shift is held
 	int mods = glutGetModifiers();
 	if (mods & GLUT_ACTIVE_SHIFT) moveSpeed *= 1.8f;
 
@@ -537,8 +514,6 @@ void myKeyboard(unsigned char button, int x, int y)
 	case 'c': case 'C':
 		currentCamera = (currentCamera == FIRST_PERSON) ? THIRD_PERSON : FIRST_PERSON;
 		break;
-
-		// WASD controls
 	case 'w': case 'W':
 	{
 		float newX = model_bmo.pos_x + sin(angle) * moveSpeed;
@@ -585,7 +560,7 @@ void myKeyboard(unsigned char button, int x, int y)
 		}
 	}
 	break;
-	case ' ': // Spacebar jump
+	case ' ':
 		if (!isJumping) {
 			isJumping = true;
 			jumpVelocity = jumpStrength;
@@ -604,7 +579,7 @@ void myKeyboard(unsigned char button, int x, int y)
 	case 'q': case 'Q':
 		exit(0);
 		break;
-	case 27: // ESC
+	case 27:
 		mouseLookEnabled = !mouseLookEnabled;
 		if (mouseLookEnabled) {
 			glutSetCursor(GLUT_CURSOR_NONE);
@@ -622,16 +597,11 @@ void myKeyboard(unsigned char button, int x, int y)
 	glutPostRedisplay();
 }
 
-//=======================================================================
-// Special Keys Function (Arrow keys)
-//=======================================================================
 void mySpecialKeys(int key, int x, int y)
 {
 	float moveSpeed = 2.0f;
 	float rotSpeed = 5.0f;
 	float angle = model_bmo.rot_y * 3.14159 / 180.0;
-	// Treat arrows as movement (Up/Down = forward/backward, Left/Right = strafe)
-	// Check for Shift modifier (sprint)
 	int mods = glutGetModifiers();
 	if (mods & GLUT_ACTIVE_SHIFT) moveSpeed *= 1.8f;
 
@@ -661,7 +631,6 @@ void mySpecialKeys(int key, int x, int y)
 	break;
 	case GLUT_KEY_LEFT:
 	{
-		// Strafe left
 		float strafeAngle = model_bmo.rot_y - 90.0f;
 		float sAngle = strafeAngle * 3.14159 / 180.0;
 		float newX = model_bmo.pos_x + sin(sAngle) * moveSpeed;
@@ -674,7 +643,6 @@ void mySpecialKeys(int key, int x, int y)
 	break;
 	case GLUT_KEY_RIGHT:
 	{
-		// Strafe right
 		float strafeAngle = model_bmo.rot_y + 90.0f;
 		float sAngle = strafeAngle * 3.14159 / 180.0;
 		float newX = model_bmo.pos_x + sin(sAngle) * moveSpeed;
@@ -689,9 +657,6 @@ void mySpecialKeys(int key, int x, int y)
 	glutPostRedisplay();
 }
 
-//=======================================================================
-// Motion Function (Mouse Movement - FPS Style)
-//=======================================================================
 void myMotion(int x, int y)
 {
 	if (!mouseLookEnabled) return;
@@ -703,47 +668,33 @@ void myMotion(int x, int y)
 		return;
 	}
 
-	// Calculate mouse movement delta from center
 	int deltaX = x - centerX;
 	int deltaY = y - centerY;
 
-	// Only update if mouse moved significantly from center
 	if (abs(deltaX) > 1 || abs(deltaY) > 1) {
-		// Update yaw (horizontal)
 		model_bmo.rot_y -= deltaX * mouseSensitivity;
-		// Update pitch (vertical) and clamp
-		cameraPitch += -deltaY * mouseSensitivity; // moving mouse down -> look down
+		cameraPitch += -deltaY * mouseSensitivity;
 		if (cameraPitch > pitchLimit) cameraPitch = pitchLimit;
 		if (cameraPitch < -pitchLimit) cameraPitch = -pitchLimit;
 
-		// Normalize rotation to 0-360 range
 		while (model_bmo.rot_y > 360.0f) model_bmo.rot_y -= 360.0f;
 		while (model_bmo.rot_y < 0.0f) model_bmo.rot_y += 360.0f;
 
-		// Re-center cursor for continuous rotation
 		glutWarpPointer(centerX, centerY);
 	}
 
 	glutPostRedisplay();
 }
 
-//=======================================================================
-// Passive Motion Function (Mouse Look when not clicking)
-//=======================================================================
 void myPassiveMotion(int x, int y)
 {
-	// Call the same motion handler for FPS-style look
 	myMotion(x, y);
 }
 
-//=======================================================================
-// Mouse Function (Click Handlers)
-//=======================================================================
 void myMouse(int button, int state, int x, int y)
 {
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
 	{
-		// Left click = Jump
 		if (!isJumping) {
 			isJumping = true;
 			jumpVelocity = jumpStrength;
@@ -752,22 +703,20 @@ void myMouse(int button, int state, int x, int y)
 	}
 	else if (button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN)
 	{
-		// Right click = Toggle camera
 		currentCamera = (currentCamera == FIRST_PERSON) ? THIRD_PERSON : FIRST_PERSON;
 		printf("Camera switched to %s\n", currentCamera == FIRST_PERSON ? "First Person" : "Third Person");
 	}
 	else if (button == GLUT_MIDDLE_BUTTON && state == GLUT_DOWN)
 	{
-		// Middle button = Toggle mouse look on/off
 		mouseLookEnabled = !mouseLookEnabled;
 		if (mouseLookEnabled) {
-			glutSetCursor(GLUT_CURSOR_NONE); // Hide cursor
+			glutSetCursor(GLUT_CURSOR_NONE);
 			glutWarpPointer(centerX, centerY);
 			firstMouse = true;
 			printf("Mouse look enabled\n");
 		}
 		else {
-			glutSetCursor(GLUT_CURSOR_INHERIT); // Show cursor
+			glutSetCursor(GLUT_CURSOR_INHERIT);
 			printf("Mouse look disabled\n");
 		}
 	}
@@ -775,16 +724,12 @@ void myMouse(int button, int state, int x, int y)
 	glutPostRedisplay();
 }
 
-//=======================================================================
-// Reshape Function
-//=======================================================================
 void myReshape(int w, int h)
 {
 	if (h == 0) h = 1;
 	WIDTH = w;
 	HEIGHT = h;
 
-	// Update center point for mouse look
 	centerX = WIDTH / 2;
 	centerY = HEIGHT / 2;
 
@@ -797,9 +742,6 @@ void myReshape(int w, int h)
 	gluLookAt(Eye.x, Eye.y, Eye.z, At.x, At.y, At.z, Up.x, Up.y, Up.z);
 }
 
-//=======================================================================
-// Assets Loading Function
-//=======================================================================
 void LoadAssets()
 {
 	// --- CANDY KINGDOM ---
@@ -811,12 +753,7 @@ void LoadAssets()
 	// --- CANDY CANE ---
 	printf("Loading OBJ Model: Candy Cane...\n");
 	model_candy_cane.Load("Models/candycane/Candy_Cane.obj", "Models/candycane/");
-	// Load texture FIRST
 	tex_candy_cane.Load("Textures/candy-cane.bmp");
-	printf("Candy cane texture ID: %d\n", tex_candy_cane.texture[0]);
-	printf("Candy cane UV count: %zu, material count: %zu\n", model_candy_cane.uvs.size(), model_candy_cane.materials.size());
-	
-	// Apply texture to materials
 	for (auto& entry : model_candy_cane.materials) {
 		entry.second.tex = tex_candy_cane;
 		entry.second.hasTexture = true;
@@ -824,17 +761,8 @@ void LoadAssets()
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
-	
-	// Debug: list materials
-	for (auto& pair : model_candy_cane.materials) {
-		printf("Candy cane material '%s' hasTexture=%d texID=%d\n",
-			pair.first.c_str(), pair.second.hasTexture ? 1 : 0, pair.second.tex.texture[0]);
-	}
-	
-	// IMPORTANT: Regenerate display list AFTER assigning textures
 	model_candy_cane.GenerateDisplayList();
-	
-	// Set transform
+
 	model_candy_cane.scale_xyz = 1.5f;
 	model_candy_cane.pos_x = 72.0f;
 	model_candy_cane.pos_y = 0.0f;
@@ -861,7 +789,7 @@ void LoadAssets()
 	model_bmo.rot_y = -90.0f;
 	printf("BMO Ready.\n");
 
-	// --- CUPCAKE ---
+	// --- CUPCAKES ---
 	printf("Loading OBJ Model: Cupcakes...\n");
 	tex_cupcake.Load("Textures/cupcake.bmp");
 
@@ -887,15 +815,60 @@ void LoadAssets()
 	}
 	printf("All Cupcakes Ready.\n");
 
+	// --- DONUT ---
+	printf("Loading OBJ Model: Donut...\n");
+	model_donut.Load("Models/donut/donut.obj", "Models/donut/");
+
+	// Load the orange/dough texture
+	tex_donut.Load("Textures/donut.bmp");
+
+	for (auto& entry : model_donut.materials) {
+		std::string name = entry.first;
+
+		// If material name contains Icing, turn off texture and make it brown
+		if (name.find("Icing") != std::string::npos || name.find("icing") != std::string::npos || name.find("Material.002") != std::string::npos)
+		{
+			entry.second.hasTexture = false;
+			// Chocolate Color
+			entry.second.diffColor[0] = 0.36f;
+			entry.second.diffColor[1] = 0.20f;
+			entry.second.diffColor[2] = 0.09f;
+		}
+		// Sprinkles (disable texture, make colorful)
+		else if (name.find("Sprinkle") != std::string::npos || name.find("sprinkle") != std::string::npos)
+		{
+			entry.second.hasTexture = false;
+			entry.second.diffColor[0] = 1.0f;
+			entry.second.diffColor[1] = 0.0f;
+			entry.second.diffColor[2] = 0.0f;
+		}
+		// Dough (keep texture)
+		else
+		{
+			entry.second.tex = tex_donut;
+			entry.second.hasTexture = true;
+			// Reset color to white so texture shows
+			entry.second.diffColor[0] = 1.0f;
+			entry.second.diffColor[1] = 1.0f;
+			entry.second.diffColor[2] = 1.0f;
+		}
+	}
+
+	model_donut.scale_xyz = 20.0f;
+	model_donut.pos_x = 95.0f;
+	model_donut.pos_y = 1.0f;
+	model_donut.pos_z = 55.0f;
+	model_donut.rot_y = 45.0f;
+
+	model_donut.GenerateDisplayList();
+	printf("Donut Loaded.\n");
+
 	// --- COINS ---
 	printf("Loading OBJ Model: Coins...\n");
 	tex_coin.Load("Textures/coin.bmp");
 
-	// Load 5 instances
 	for (int i = 0; i < NUM_COINS; i++) {
 		model_coins[i].Load("Models/coin/coin.obj", "Models/coin/");
-
-		// Apply Texture
 		for (auto& entry : model_coins[i].materials) {
 			entry.second.tex = tex_coin;
 			entry.second.hasTexture = true;
@@ -903,16 +876,11 @@ void LoadAssets()
 			entry.second.diffColor[1] = 1.0f;
 			entry.second.diffColor[2] = 1.0f;
 		}
-
 		model_coins[i].scale_xyz = 2.0f;
-
-		// Initial positions (doesn't affect display as display uses array)
 		model_coins[i].pos_x = coinPositions[i][0];
 		model_coins[i].pos_y = coinPositions[i][1];
 		model_coins[i].pos_z = coinPositions[i][2];
-
 		model_coins[i].GenerateDisplayList();
-
 		coinVisible[i] = true;
 	}
 	printf("Coins Loaded.\n");
@@ -920,11 +888,8 @@ void LoadAssets()
 	// --- FINN ---
 	printf("Loading OBJ Model: Finn...\n");
 	model_finn.Load("Models/finn/Finn.obj", "Models/finn/");
-
-	// 1. Load the Texture (Make sure "finn.bmp" exists in your Textures folder)
 	tex_finn.Load("Textures/finn.bmp");
 
-	// 2. Assign texture to materials
 	for (auto& entry : model_finn.materials) {
 		entry.second.tex = tex_finn;
 		entry.second.hasTexture = true;
@@ -939,20 +904,8 @@ void LoadAssets()
 	model_finn.pos_z = 53.0f;
 	model_finn.rot_y = -90.0f;
 
-	// 3. Generate Display List AFTER assigning texture
 	model_finn.GenerateDisplayList();
 	printf("Finn Ready.\n");
-
-	// --- DONUT ---
-	printf("Loading OBJ Model: Donut...\n");
-	model_donut.Load("models/donut/donut.obj", "models/donut/");
-	model_donut.scale_xyz = 50.0f;
-	model_donut.pos_x = model_finn.pos_x + 5.0f;
-	model_donut.pos_y = model_finn.pos_y;
-	model_donut.pos_z = model_finn.pos_z + 2.0f;
-	model_donut.rot_y = 0.0f;
-	model_donut.GenerateDisplayList();
-	printf("Donut Loaded.\n");
 
 	// --- JELLY ---
 	printf("Loading OBJ Model: Jelly...\n");
@@ -967,21 +920,15 @@ void LoadAssets()
 	}
 
 	model_jelly.GenerateDisplayList();
-
 	model_jelly.scale_xyz = 30.0f;
 	model_jelly.pos_x = 80.0f;
 	model_jelly.pos_y = 0.0f;
 	model_jelly.pos_z = 50.0f;
-
 	printf("Jelly Loaded.\n");
 }
 
-//=======================================================================
-// Animation/Idle Function
-//=======================================================================
 void myIdle(void)
 {
-	// Jump physics
 	if (isJumping) {
 		model_bmo.pos_y += jumpVelocity;
 		jumpVelocity -= gravity;
@@ -992,25 +939,23 @@ void myIdle(void)
 		}
 	}
 
-	// Cupcake rotation animation
+	// Animate Objects
 	cupcakeRotation += 1.0f;
 	if (cupcakeRotation >= 360.0f)
 		cupcakeRotation = 0.0f;
 
-	// SPIN THE COIN
 	coinRotation += 2.0f;
 	if (coinRotation >= 360.0f)
 		coinRotation = 0.0f;
 
-	// BOUNCE THE COIN
 	coinBounceAngle += 0.1f;
+
+	// Animate Donut (Shake/Bounce)
+	donutShakeAngle += 0.1f;
 
 	glutPostRedisplay();
 }
 
-//=======================================================================
-// Main Function
-//=======================================================================
 void main(int argc, char** argv)
 {
 	glutInit(&argc, argv);
@@ -1025,11 +970,10 @@ void main(int argc, char** argv)
 	glutSpecialFunc(mySpecialKeys);
 	glutIdleFunc(myIdle);
 	glutMotionFunc(myMotion);
-	glutPassiveMotionFunc(myPassiveMotion); // FPS-style mouse look
+	glutPassiveMotionFunc(myPassiveMotion);
 	glutMouseFunc(myMouse);
 	glutReshapeFunc(myReshape);
 
-	// Hide cursor for FPS experience
 	glutSetCursor(GLUT_CURSOR_NONE);
 	glutWarpPointer(centerX, centerY);
 
