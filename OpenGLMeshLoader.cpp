@@ -73,6 +73,19 @@ float donutShakeAngle = 0.0f;
 Model_OBJ model_fire_temple;
 GLTexture tex_fire_temple;
 
+// --- GOLEM VARIABLES ---
+Model_OBJ model_golem;
+GLTexture tex_golem_em_map;
+GLTexture tex_golem_lava_eye;
+GLTexture tex_golem_norma;
+GLTexture tex_golem_ao;
+GLTexture tex_golem_podstavka;
+GLTexture tex_golem_final;
+
+// --- SKY VARIABLES ---
+Model_OBJ model_sky;
+GLTexture tex_sky;
+
 // Cupcake array for collectibles
 const int NUM_CUPCAKES = 5;
 Model_OBJ model_cupcakes[NUM_CUPCAKES];
@@ -430,6 +443,25 @@ void myDisplay(void)
 
 	if (currentLevel == LEVEL_CANDY)
 	{
+		// --- DRAW SKY (Background) ---
+		glPushMatrix();
+		glDisable(GL_LIGHTING);  // Sky doesn't need lighting
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		
+		// Bind sky texture if available
+		if (tex_sky.texture[0] > 0) {
+			glBindTexture(GL_TEXTURE_2D, tex_sky.texture[0]);
+		}
+		
+		// Position sky centered on the camera/world
+		glTranslatef(model_sky.pos_x, model_sky.pos_y, model_sky.pos_z);
+		model_sky.Draw();
+		
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glEnable(GL_LIGHTING);  // Re-enable lighting for other objects
+		glPopMatrix();
+		
 		// Draw Candy Kingdom
 		model_candy_kingdom.Draw();
 
@@ -522,6 +554,25 @@ void myDisplay(void)
 	}
 	else if (currentLevel == LEVEL_FIRE)
 	{
+		// --- DRAW SKY (Background) ---
+		glPushMatrix();
+		glDisable(GL_LIGHTING);  // Sky doesn't need lighting
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		
+		// Bind sky texture if available
+		if (tex_sky.texture[0] > 0) {
+			glBindTexture(GL_TEXTURE_2D, tex_sky.texture[0]);
+		}
+		
+		// Position sky centered on the camera/world
+		glTranslatef(model_sky.pos_x, model_sky.pos_y, model_sky.pos_z);
+		model_sky.Draw();
+		
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glEnable(GL_LIGHTING);  // Re-enable lighting for other objects
+		glPopMatrix();
+		
 		// --- DRAW FIRE KINGDOM TEMPLE ---
 		glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
@@ -554,6 +605,35 @@ void myDisplay(void)
 		model_fire_temple.pos_z = temp_z;
 
 		glBindTexture(GL_TEXTURE_2D, 0);
+		glPopMatrix();
+		
+		// --- DRAW GOLEM ---
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		
+		// Apply Golem transformations
+		glTranslatef(model_golem.pos_x, model_golem.pos_y, model_golem.pos_z);
+		glRotatef(model_golem.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
+		glRotatef(model_golem.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
+		glRotatef(model_golem.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
+		
+		// Temporarily reset position for proper rendering
+		float temp_golem_x = model_golem.pos_x;
+		float temp_golem_y = model_golem.pos_y;
+		float temp_golem_z = model_golem.pos_z;
+		model_golem.pos_x = 0.0f;
+		model_golem.pos_y = 0.0f;
+		model_golem.pos_z = 0.0f;
+		
+		// Draw Golem (it will use its own material textures from the model)
+		model_golem.Draw();
+		
+		// Restore position
+		model_golem.pos_x = temp_golem_x;
+		model_golem.pos_y = temp_golem_y;
+		model_golem.pos_z = temp_golem_z;
+		
 		glPopMatrix();
 	}
 
@@ -889,6 +969,116 @@ void LoadAssets()
 
 	model_fire_temple.GenerateDisplayList();
 	printf("Fire Temple Loaded.\n");
+
+	// --- GOLEM ---
+	printf("Loading OBJ Model: Golem...\n");
+	model_golem.Load("Models/golem/golem.obj", "Models/golem/");
+	
+	// Load all Golem textures with error checking
+	printf("Loading Golem textures...\n");
+	tex_golem_final.Load("Textures/texturesgolem/????????_????_?????.png");
+	printf("  - Main texture loaded\n");
+	tex_golem_lava_eye.Load("Textures/texturesgolem/LAva_Eye_DIFF.png");
+	printf("  - Lava eye texture loaded\n");
+	tex_golem_em_map.Load("Textures/texturesgolem/EM_MAP.png");
+	printf("  - EM map loaded\n");
+	tex_golem_norma.Load("Textures/texturesgolem/?????_????_?????.jpg");
+	printf("  - Normal map loaded\n");
+	tex_golem_ao.Load("Textures/texturesgolem/?????-????_AO.png");
+	printf("  - AO map loaded\n");
+	tex_golem_podstavka.Load("Textures/texturesgolem/?????????.png");
+	printf("  - Base texture loaded\n");
+	
+	// Debug: Print all material names
+	printf("Golem materials found:\n");
+	for (auto& entry : model_golem.materials) {
+		printf("  - Material: %s\n", entry.first.c_str());
+	}
+	
+	// Apply textures to Golem materials based on material names
+	for (auto& entry : model_golem.materials) {
+		std::string materialName = entry.first;
+		
+		// Apply appropriate texture based on material name
+		if (materialName.find("Eye") != std::string::npos || 
+		    materialName.find("eye") != std::string::npos ||
+		    materialName.find("Lava") != std::string::npos ||
+		    materialName.find("lava") != std::string::npos) {
+			entry.second.tex = tex_golem_lava_eye;
+			entry.second.hasTexture = true;
+			printf("  - Applied lava eye texture to: %s\n", materialName.c_str());
+		}
+		else if (materialName.find("Podstavka") != std::string::npos || 
+		         materialName.find("podstavka") != std::string::npos ||
+		 materialName.find("Base") != std::string::npos ||
+		      materialName.find("base") != std::string::npos) {
+			entry.second.tex = tex_golem_podstavka;
+			entry.second.hasTexture = true;
+			printf("  - Applied base texture to: %s\n", materialName.c_str());
+		}
+		else {
+			// Use main texture for body
+			entry.second.tex = tex_golem_final;
+			entry.second.hasTexture = true;
+			printf("  - Applied main texture to: %s\n", materialName.c_str());
+		}
+		
+		// Ensure proper color for texture display
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
+	
+	// Set Golem size MUCH smaller than BMO (BMO is 10.0, make Golem 2.0)
+	model_golem.scale_xyz = 0.5f;  // Made even smaller (was 2.0f, now 0.5f)
+	
+	// Position Golem next to BMO in Fire Kingdom
+	model_golem.pos_x = -115.0f;  // Near BMO's spawn position (-111.0)
+	model_golem.pos_y = 0.0f;     // Ground level
+	model_golem.pos_z = 2418.0f;  // Near BMO's spawn position (2416.1)
+	
+	// Rotate Golem to face BMO/temple - simplified rotation
+	model_golem.rot_x = 0.0f;     // No pitch rotation
+	model_golem.rot_y = 180.0f;   // Face forward
+	model_golem.rot_z = 0.0f;     // No roll rotation
+	
+	model_golem.GenerateDisplayList();
+	printf("Golem Loaded with textures.\n");
+
+	// --- SKY ---
+	printf("Loading OBJ Model: Sky...\n");
+	model_sky.Load("Models/sky/sky.obj", "Models/sky/");
+	
+	// Load sky texture - BMP format
+	printf("Loading sky texture...\n");
+	tex_sky.Load("Textures/sky.bmp");  // Load sky.bmp
+	printf("  - Sky texture loaded: sky.bmp\n");
+	
+	// Sky is typically very large and encompasses the entire scene
+	model_sky.scale_xyz = 500.0f;  // Very large scale to act as skybox
+	
+	// Center the sky at the origin
+	model_sky.pos_x = 0.0f;
+	model_sky.pos_y = 0.0f;
+	model_sky.pos_z = 0.0f;
+	
+	// No rotation needed
+	model_sky.rot_x = 0.0f;
+	model_sky.rot_y = 0.0f;
+	model_sky.rot_z = 0.0f;
+	
+	// Apply sky texture to all materials or use bright color if no texture
+	for (auto& entry : model_sky.materials) {
+		entry.second.tex = tex_sky;
+		entry.second.hasTexture = true;
+		// Use bright sky blue color as fallback
+		entry.second.diffColor[0] = 0.53f;  // Sky blue R
+		entry.second.diffColor[1] = 0.81f;  // Sky blue G
+		entry.second.diffColor[2] = 0.92f;  // Sky blue B
+	}
+	
+	model_sky.GenerateDisplayList();
+	printf("Sky Loaded.\n");
 
 	// --- CANDY CANE ---
 	printf("Loading OBJ Model: Candy Cane...\n");
