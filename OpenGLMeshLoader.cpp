@@ -309,19 +309,18 @@ void CheckFinnCollision()
 		printf(">>> TRAVELING TO FIRE KINGDOM! <<<\n");
 		currentLevel = LEVEL_FIRE;
 
-		// --- NEW SPAWN LOGIC ---
-		// 1. Position BMO high in the sky (Y = 150)
-		model_bmo.pos_y = 150.0f;
+		// Place BMO on the Fire Kingdom ground - FINAL TESTED VALUES
+		model_bmo.pos_x = -111.0f;   // Final X position from testing
+		model_bmo.pos_z = 2416.1f;   // Final Z position from testing
+		model_bmo.pos_y = 0.0f;      // Ground level
 
-		// 2. Position X/Z slightly away from center so we see the temple while falling
-		model_bmo.pos_x = 0.0f;
-		model_bmo.pos_z = 180.0f;
+		// Apply final rotation values - TESTED ORIENTATION
+		model_bmo.rot_x = -240.0f;   // X-axis rotation (pitch)
+		model_bmo.rot_y = 329.0f;    // Y-axis rotation (yaw/facing)
+		model_bmo.rot_z = 240.0f;    // Z-axis rotation (roll)
 
-		// 3. Face the temple
-		model_bmo.rot_y = 180.0f;
-
-		// 4. Trigger Gravity immediately so he falls
-		isJumping = true;
+		// Ensure physics state is stable on arrival
+		isJumping = false;
 		jumpVelocity = 0.0f;
 	}
 }
@@ -531,10 +530,28 @@ void myDisplay(void)
 		// Bind the Fire Temple Texture
 		glBindTexture(GL_TEXTURE_2D, tex_fire_temple.texture[0]);
 
-		// You may need to rotate it if it loads sideways, usually objs are fine
-		// model_fire_temple.rot_y = 180; // Example if needed
+		// Apply transformations to flip it right-side up
+		glTranslatef(model_fire_temple.pos_x, model_fire_temple.pos_y, model_fire_temple.pos_z);
+		
+		// Apply rotation - X-axis first (flip upside down)
+		glRotatef(model_fire_temple.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis rotation (180 degrees)
+		glRotatef(model_fire_temple.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis rotation
+		glRotatef(model_fire_temple.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis rotation
+		
+		// Temporarily reset position to origin for proper rotation
+		float temp_x = model_fire_temple.pos_x;
+		float temp_y = model_fire_temple.pos_y;
+		float temp_z = model_fire_temple.pos_z;
+		model_fire_temple.pos_x = 0.0f;
+		model_fire_temple.pos_y = 0.0f;
+		model_fire_temple.pos_z = 0.0f;
 
 		model_fire_temple.Draw();
+
+		// Restore position
+		model_fire_temple.pos_x = temp_x;
+		model_fire_temple.pos_y = temp_y;
+		model_fire_temple.pos_z = temp_z;
 
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
@@ -549,7 +566,32 @@ void myDisplay(void)
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
 		glBindTexture(GL_TEXTURE_2D, tex_bmo.texture[0]);
+		
+		// Apply BMO transformations (position and rotation)
+		glTranslatef(model_bmo.pos_x, model_bmo.pos_y, model_bmo.pos_z);
+		glRotatef(model_bmo.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
+		glRotatef(model_bmo.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
+		glRotatef(model_bmo.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
+		
+		// Temporarily reset position to origin for proper rendering
+		float temp_bmo_x = model_bmo.pos_x;
+		float temp_bmo_y = model_bmo.pos_y;
+		float temp_bmo_z = model_bmo.pos_z;
+		float temp_bmo_rot_y = model_bmo.rot_y;
+		
+		model_bmo.pos_x = 0.0f;
+		model_bmo.pos_y = 0.0f;
+		model_bmo.pos_z = 0.0f;
+		model_bmo.rot_y = 0.0f;
+		
 		model_bmo.Draw();
+		
+		// Restore BMO values
+		model_bmo.pos_x = temp_bmo_x;
+		model_bmo.pos_y = temp_bmo_y;
+		model_bmo.pos_z = temp_bmo_z;
+		model_bmo.rot_y = temp_bmo_rot_y;
+		
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
 	}
@@ -596,7 +638,7 @@ void myKeyboard(unsigned char button, int x, int y)
 		float newX = model_bmo.pos_x + sin(a) * moveSpeed;
 		float newZ = model_bmo.pos_z - cos(a) * moveSpeed;
 		if (TryMove(newX, newZ)) {
-			CheckCupcakeCollisions();
+		CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
 		}
@@ -622,7 +664,7 @@ void myKeyboard(unsigned char button, int x, int y)
 		float newX = model_bmo.pos_x + sin(sAngle) * moveSpeed;
 		float newZ = model_bmo.pos_z - cos(sAngle) * moveSpeed;
 		if (TryMove(newX, newZ)) {
-			CheckCupcakeCollisions();
+		 CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
 		}
@@ -639,13 +681,6 @@ void myKeyboard(unsigned char button, int x, int y)
 		break;
 	case 'o': case 'O':
 		model_bmo.rot_y += rotSpeed;
-		break;
-	case 'p': case 'P':
-		printf("BMO: pos=(%.2f, %.2f, %.2f) rot=%.2f\n", model_bmo.pos_x, model_bmo.pos_y, model_bmo.pos_z, model_bmo.rot_y);
-		printf("Score: %d\n", score);
-		break;
-	case 'q': case 'Q':
-		exit(0);
 		break;
 	case 27:
 		mouseLookEnabled = !mouseLookEnabled;
@@ -838,14 +873,19 @@ void LoadAssets()
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
+
 	// Scale it BIG
 	model_fire_temple.scale_xyz = 200.0f;
 
-	// Position it
+	// Position it - FINAL TESTED VALUES
 	model_fire_temple.pos_x = 0.0f;
-	// LOWER THE TEMPLE so BMO lands on the floor (Y=0), not inside the base
-	model_fire_temple.pos_y = -20.0f;
+	model_fire_temple.pos_y = 595.0f;  // Final value from testing
 	model_fire_temple.pos_z = 0.0f;
+	
+	// Rotate to flip it right-side up - CORRECT VALUE
+	model_fire_temple.rot_x = -290.0f;  // Correct rotation value found through testing
+	model_fire_temple.rot_y = 0.0f;
+	model_fire_temple.rot_z = 0.0f;
 
 	model_fire_temple.GenerateDisplayList();
 	printf("Fire Temple Loaded.\n");
