@@ -12,13 +12,14 @@ int WIDTH = 1280;
 int HEIGHT = 720;
 
 GLuint tex;
-char title[] = "3D Model Loader Sample";
+char title[] = "BMO's Quest";
 
 // 3D Projection Options
 GLdouble fovy = 45.0;
 GLdouble aspectRatio = (GLdouble)WIDTH / (GLdouble)HEIGHT;
 GLdouble zNear = 0.1;
-GLdouble zFar = 1000;
+// Increased zFar so we can see the ground when falling from the sky
+GLdouble zFar = 3000;
 
 class Vector
 {
@@ -44,6 +45,10 @@ int cameraZoom = 0;
 enum CameraMode { FIRST_PERSON, THIRD_PERSON };
 CameraMode currentCamera = THIRD_PERSON;
 
+// --- LEVEL MANAGEMENT ---
+enum GameLevel { LEVEL_CANDY, LEVEL_FIRE };
+GameLevel currentLevel = LEVEL_CANDY;
+
 // Debugging Camera Height
 float cameraHeightOffset = 0.0f;
 
@@ -63,6 +68,23 @@ Model_OBJ model_donut;
 GLTexture tex_donut;
 // Animation for Donut
 float donutShakeAngle = 0.0f;
+
+// --- FIRE KINGDOM VARIABLES ---
+Model_OBJ model_fire_temple;
+GLTexture tex_fire_temple;
+
+// --- GOLEM VARIABLES ---
+Model_OBJ model_golem;
+GLTexture tex_golem_em_map;
+GLTexture tex_golem_lava_eye;
+GLTexture tex_golem_norma;
+GLTexture tex_golem_ao;
+GLTexture tex_golem_podstavka;
+GLTexture tex_golem_final;
+
+// --- SKY VARIABLES ---
+Model_OBJ model_sky;
+GLTexture tex_sky;
 
 // Cupcake array for collectibles
 const int NUM_CUPCAKES = 5;
@@ -158,7 +180,7 @@ void RenderHUD()
 	glDisable(GL_BLEND);
 
 	char buf[64];
-	sprintf(buf, "Score: %d", score);
+	sprintf(buf, "Score: %d | Level: %s", score, (currentLevel == LEVEL_CANDY ? "Candy" : "Fire"));
 	glColor3f(1.0f, 1.0f, 1.0f);
 	glRasterPos2i(x + 12, y + 12);
 	for (char* c = buf; *c != '\0'; ++c)
@@ -220,6 +242,8 @@ void myInit(void)
 
 bool CheckJellyCollision(float newX, float newZ)
 {
+	if (currentLevel != LEVEL_CANDY) return false;
+
 	float jellyRadius = 1.35f;
 	float dx = newX - model_jelly.pos_x;
 	float dz = newZ - model_jelly.pos_z;
@@ -230,6 +254,8 @@ bool CheckJellyCollision(float newX, float newZ)
 // --- DONUT OBSTACLE LOGIC ---
 bool CheckDonutCollision(float newX, float newZ)
 {
+	if (currentLevel != LEVEL_CANDY) return false;
+
 	float donutRadius = 2.0f; // Radius for collision
 	float dx = newX - model_donut.pos_x;
 	float dz = newZ - model_donut.pos_z;
@@ -239,6 +265,8 @@ bool CheckDonutCollision(float newX, float newZ)
 
 void CheckCupcakeCollisions()
 {
+	if (currentLevel != LEVEL_CANDY) return;
+
 	for (int i = 0; i < NUM_CUPCAKES; i++)
 	{
 		if (!cupcakeVisible[i]) continue;
@@ -258,6 +286,8 @@ void CheckCupcakeCollisions()
 
 void CheckCoinCollision()
 {
+	if (currentLevel != LEVEL_CANDY) return;
+
 	float coinCollisionRadius = 3.0f;
 
 	for (int i = 0; i < NUM_COINS; i++)
@@ -274,6 +304,37 @@ void CheckCoinCollision()
 			score += COIN_POINTS;
 			printf("Coin %d Collected! +%d Points\n", i + 1, COIN_POINTS);
 		}
+	}
+}
+
+// --- FINN COLLISION / LEVEL TRANSITION ---
+void CheckFinnCollision()
+{
+	if (currentLevel != LEVEL_CANDY) return;
+
+	float finnRadius = 2.0f;
+	float dx = model_bmo.pos_x - model_finn.pos_x;
+	float dz = model_bmo.pos_z - model_finn.pos_z;
+	float distance = sqrt(dx * dx + dz * dz);
+
+	if (distance < finnRadius)
+	{
+		printf(">>> TRAVELING TO FIRE KINGDOM! <<<\n");
+		currentLevel = LEVEL_FIRE;
+
+		// Place BMO on the Fire Kingdom ground - FINAL TESTED VALUES
+		model_bmo.pos_x = -111.0f;   // Final X position from testing
+		model_bmo.pos_z = 2416.1f;   // Final Z position from testing
+		model_bmo.pos_y = 0.0f;      // Ground level
+
+		// Apply final rotation values - TESTED ORIENTATION
+		model_bmo.rot_x = -240.0f;   // X-axis rotation (pitch)
+		model_bmo.rot_y = 329.0f;    // Y-axis rotation (yaw/facing)
+		model_bmo.rot_z = 240.0f;    // Z-axis rotation (roll)
+
+		// Ensure physics state is stable on arrival
+		isJumping = false;
+		jumpVelocity = 0.0f;
 	}
 }
 
@@ -376,119 +437,244 @@ void myDisplay(void)
 	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
 	glLightfv(GL_LIGHT0, GL_AMBIENT, lightIntensity);
 
-	model_candy_kingdom.Draw();
+	// ============================================
+	// RENDER ENVIRONMENT BASED ON LEVEL
+	// ============================================
 
-	// Candy Cane
-	glPushMatrix();
-	glEnable(GL_TEXTURE_2D);
-	glColor3f(1.0f, 1.0f, 1.0f);
-	glBindTexture(GL_TEXTURE_2D, tex_candy_cane.texture[0]);
-	model_candy_cane.Draw();
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glPopMatrix();
+	if (currentLevel == LEVEL_CANDY)
+	{
+		// --- DRAW SKY (Background) ---
+		glPushMatrix();
+		glDisable(GL_LIGHTING);  // Sky doesn't need lighting
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		
+		// Bind sky texture if available
+		if (tex_sky.texture[0] > 0) {
+			glBindTexture(GL_TEXTURE_2D, tex_sky.texture[0]);
+		}
+		
+		// Position sky centered on the camera/world
+		glTranslatef(model_sky.pos_x, model_sky.pos_y, model_sky.pos_z);
+		model_sky.Draw();
+		
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glEnable(GL_LIGHTING);  // Re-enable lighting for other objects
+		glPopMatrix();
+		
+		// Draw Candy Kingdom
+		model_candy_kingdom.Draw();
 
-	// BMO
+		// Candy Cane
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		glBindTexture(GL_TEXTURE_2D, tex_candy_cane.texture[0]);
+		model_candy_cane.Draw();
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glPopMatrix();
+
+		// Finn (The Portal)
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		glBindTexture(GL_TEXTURE_2D, tex_finn.texture[0]);
+		model_finn.Draw();
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glPopMatrix();
+
+		// Cupcakes
+		for (int i = 0; i < NUM_CUPCAKES; i++)
+		{
+			if (cupcakeVisible[i])
+			{
+				glPushMatrix();
+				glTranslatef(model_cupcakes[i].pos_x, model_cupcakes[i].pos_y, model_cupcakes[i].pos_z);
+				glRotatef(cupcakeRotation, 0.0f, 1.0f, 0.0f);
+				glTranslatef(-model_cupcakes[i].pos_x, -model_cupcakes[i].pos_y, -model_cupcakes[i].pos_z);
+				model_cupcakes[i].Draw();
+				glPopMatrix();
+			}
+		}
+
+		// Donut
+		glPushMatrix();
+		glColor3f(1.0f, 1.0f, 1.0f);
+		float donutBounce = 0.3f * sin(donutShakeAngle);
+		float donutWiggle = 5.0f * cos(donutShakeAngle * 2.0f);
+		float ox = model_donut.pos_x;
+		float oy = model_donut.pos_y;
+		float oz = model_donut.pos_z;
+		glTranslatef(ox, oy + donutBounce, oz);
+		glRotatef(model_donut.rot_y, 0, 1, 0);
+		glRotatef(donutWiggle, 0, 0, 1);
+		model_donut.pos_x = 0;
+		model_donut.pos_y = 0;
+		model_donut.pos_z = 0;
+		model_donut.rot_y = 0;
+		model_donut.Draw();
+		model_donut.pos_x = ox;
+		model_donut.pos_y = oy;
+		model_donut.pos_z = oz;
+		model_donut.rot_y = 45.0f;
+		glPopMatrix();
+
+		// Coins
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, tex_coin.texture[0]);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		for (int i = 0; i < NUM_COINS; i++)
+		{
+			if (coinVisible[i])
+			{
+				glPushMatrix();
+				float bounceHeight = 0.5f * sin(coinBounceAngle);
+				float cx = coinPositions[i][0];
+				float cy = coinPositions[i][1];
+				float cz = coinPositions[i][2];
+				glTranslatef(cx, cy + bounceHeight, cz);
+				glRotatef(coinRotation, 0.0f, 1.0f, 0.0f);
+				model_coins[i].pos_x = 0;
+				model_coins[i].pos_y = 0;
+				model_coins[i].pos_z = 0;
+				model_coins[i].Draw();
+				glPopMatrix();
+			}
+		}
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+		// Jelly
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, tex_jelly.texture[0]);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		model_jelly.Draw();
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glPopMatrix();
+	}
+	else if (currentLevel == LEVEL_FIRE)
+	{
+		// --- DRAW SKY (Background) ---
+		glPushMatrix();
+		glDisable(GL_LIGHTING);  // Sky doesn't need lighting
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		
+		// Bind sky texture if available
+		if (tex_sky.texture[0] > 0) {
+			glBindTexture(GL_TEXTURE_2D, tex_sky.texture[0]);
+		}
+		
+		// Position sky centered on the camera/world
+		glTranslatef(model_sky.pos_x, model_sky.pos_y, model_sky.pos_z);
+		model_sky.Draw();
+		
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glEnable(GL_LIGHTING);  // Re-enable lighting for other objects
+		glPopMatrix();
+		
+		// --- DRAW FIRE KINGDOM TEMPLE ---
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+
+		// Bind the Fire Temple Texture
+		glBindTexture(GL_TEXTURE_2D, tex_fire_temple.texture[0]);
+
+		// Apply transformations to flip it right-side up
+		glTranslatef(model_fire_temple.pos_x, model_fire_temple.pos_y, model_fire_temple.pos_z);
+		
+		// Apply rotation - X-axis first (flip upside down)
+		glRotatef(model_fire_temple.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis rotation (180 degrees)
+		glRotatef(model_fire_temple.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis rotation
+		glRotatef(model_fire_temple.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis rotation
+		
+		// Temporarily reset position to origin for proper rotation
+		float temp_x = model_fire_temple.pos_x;
+		float temp_y = model_fire_temple.pos_y;
+		float temp_z = model_fire_temple.pos_z;
+		model_fire_temple.pos_x = 0.0f;
+		model_fire_temple.pos_y = 0.0f;
+		model_fire_temple.pos_z = 0.0f;
+
+		model_fire_temple.Draw();
+
+		// Restore position
+		model_fire_temple.pos_x = temp_x;
+		model_fire_temple.pos_y = temp_y;
+		model_fire_temple.pos_z = temp_z;
+
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glPopMatrix();
+		
+		// --- DRAW GOLEM ---
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		
+		// Apply Golem transformations
+		glTranslatef(model_golem.pos_x, model_golem.pos_y, model_golem.pos_z);
+		glRotatef(model_golem.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
+		glRotatef(model_golem.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
+		glRotatef(model_golem.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
+		
+		// Temporarily reset position for proper rendering
+		float temp_golem_x = model_golem.pos_x;
+		float temp_golem_y = model_golem.pos_y;
+		float temp_golem_z = model_golem.pos_z;
+		model_golem.pos_x = 0.0f;
+		model_golem.pos_y = 0.0f;
+		model_golem.pos_z = 0.0f;
+		
+		// Draw Golem (it will use its own material textures from the model)
+		model_golem.Draw();
+		
+		// Restore position
+		model_golem.pos_x = temp_golem_x;
+		model_golem.pos_y = temp_golem_y;
+		model_golem.pos_z = temp_golem_z;
+		
+		glPopMatrix();
+	}
+
+	// ============================================
+	// DRAW BMO (Available in both levels)
+	// ============================================
 	if (currentCamera != FIRST_PERSON)
 	{
 		glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
 		glBindTexture(GL_TEXTURE_2D, tex_bmo.texture[0]);
+		
+		// Apply BMO transformations (position and rotation)
+		glTranslatef(model_bmo.pos_x, model_bmo.pos_y, model_bmo.pos_z);
+		glRotatef(model_bmo.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
+		glRotatef(model_bmo.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
+		glRotatef(model_bmo.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
+		
+		// Temporarily reset position to origin for proper rendering
+		float temp_bmo_x = model_bmo.pos_x;
+		float temp_bmo_y = model_bmo.pos_y;
+		float temp_bmo_z = model_bmo.pos_z;
+		float temp_bmo_rot_y = model_bmo.rot_y;
+		
+		model_bmo.pos_x = 0.0f;
+		model_bmo.pos_y = 0.0f;
+		model_bmo.pos_z = 0.0f;
+		model_bmo.rot_y = 0.0f;
+		
 		model_bmo.Draw();
+		
+		// Restore BMO values
+		model_bmo.pos_x = temp_bmo_x;
+		model_bmo.pos_y = temp_bmo_y;
+		model_bmo.pos_z = temp_bmo_z;
+		model_bmo.rot_y = temp_bmo_rot_y;
+		
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
 	}
-
-	// Finn
-	glPushMatrix();
-	glEnable(GL_TEXTURE_2D);
-	glColor3f(1.0f, 1.0f, 1.0f);
-	glBindTexture(GL_TEXTURE_2D, tex_finn.texture[0]);
-	model_finn.Draw();
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glPopMatrix();
-
-	// Cupcakes
-	for (int i = 0; i < NUM_CUPCAKES; i++)
-	{
-		if (cupcakeVisible[i])
-		{
-			glPushMatrix();
-			glTranslatef(model_cupcakes[i].pos_x, model_cupcakes[i].pos_y, model_cupcakes[i].pos_z);
-			glRotatef(cupcakeRotation, 0.0f, 1.0f, 0.0f);
-			glTranslatef(-model_cupcakes[i].pos_x, -model_cupcakes[i].pos_y, -model_cupcakes[i].pos_z);
-			model_cupcakes[i].Draw();
-			glPopMatrix();
-		}
-	}
-
-	// --- DRAW DONUT (OBSTACLE + ANIMATED) ---
-	glPushMatrix();
-	glColor3f(1.0f, 1.0f, 1.0f);
-
-	// Calculate animation offsets
-	float donutBounce = 0.3f * sin(donutShakeAngle);
-	float donutWiggle = 5.0f * cos(donutShakeAngle * 2.0f);
-
-	// Backup original coordinates
-	float ox = model_donut.pos_x;
-	float oy = model_donut.pos_y;
-	float oz = model_donut.pos_z;
-
-	// Apply Transformations relative to where the donut SHOULD be
-	glTranslatef(ox, oy + donutBounce, oz);
-	glRotatef(model_donut.rot_y, 0, 1, 0); // Original rotation
-	glRotatef(donutWiggle, 0, 0, 1);       // Wiggle on Z axis (shake side to side)
-
-	// Zero out model internal coords so Draw() happens at (0,0,0) local to the transformation
-	model_donut.pos_x = 0;
-	model_donut.pos_y = 0;
-	model_donut.pos_z = 0;
-	model_donut.rot_y = 0;
-
-	model_donut.Draw();
-
-	// Restore original coordinates for collision logic
-	model_donut.pos_x = ox;
-	model_donut.pos_y = oy;
-	model_donut.pos_z = oz;
-	model_donut.rot_y = 45.0f; // Original rotation value
-
-	glPopMatrix();
-
-	// Coins
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, tex_coin.texture[0]);
-	glColor3f(1.0f, 1.0f, 1.0f);
-
-	for (int i = 0; i < NUM_COINS; i++)
-	{
-		if (coinVisible[i])
-		{
-			glPushMatrix();
-			float bounceHeight = 0.5f * sin(coinBounceAngle);
-			float ox = coinPositions[i][0];
-			float oy = coinPositions[i][1];
-			float oz = coinPositions[i][2];
-			glTranslatef(ox, oy + bounceHeight, oz);
-			glRotatef(coinRotation, 0.0f, 1.0f, 0.0f);
-			model_coins[i].pos_x = 0;
-			model_coins[i].pos_y = 0;
-			model_coins[i].pos_z = 0;
-			model_coins[i].Draw();
-			glPopMatrix();
-		}
-	}
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	// Jelly
-	glPushMatrix();
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, tex_jelly.texture[0]);
-	glColor3f(1.0f, 1.0f, 1.0f);
-	model_jelly.Draw();
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glPopMatrix();
 
 	RenderHUD();
 	glutSwapBuffers();
@@ -521,6 +707,7 @@ void myKeyboard(unsigned char button, int x, int y)
 		if (TryMove(newX, newZ)) {
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
+			CheckFinnCollision(); // Check for Level Transfer
 		}
 	}
 	break;
@@ -531,8 +718,9 @@ void myKeyboard(unsigned char button, int x, int y)
 		float newX = model_bmo.pos_x + sin(a) * moveSpeed;
 		float newZ = model_bmo.pos_z - cos(a) * moveSpeed;
 		if (TryMove(newX, newZ)) {
-			CheckCupcakeCollisions();
+		CheckCupcakeCollisions();
 			CheckCoinCollision();
+			CheckFinnCollision();
 		}
 	}
 	break;
@@ -545,6 +733,7 @@ void myKeyboard(unsigned char button, int x, int y)
 		if (TryMove(newX, newZ)) {
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
+			CheckFinnCollision();
 		}
 	}
 	break;
@@ -555,8 +744,9 @@ void myKeyboard(unsigned char button, int x, int y)
 		float newX = model_bmo.pos_x + sin(sAngle) * moveSpeed;
 		float newZ = model_bmo.pos_z - cos(sAngle) * moveSpeed;
 		if (TryMove(newX, newZ)) {
-			CheckCupcakeCollisions();
+		 CheckCupcakeCollisions();
 			CheckCoinCollision();
+			CheckFinnCollision();
 		}
 	}
 	break;
@@ -571,13 +761,6 @@ void myKeyboard(unsigned char button, int x, int y)
 		break;
 	case 'o': case 'O':
 		model_bmo.rot_y += rotSpeed;
-		break;
-	case 'p': case 'P':
-		printf("BMO: pos=(%.2f, %.2f, %.2f) rot=%.2f\n", model_bmo.pos_x, model_bmo.pos_y, model_bmo.pos_z, model_bmo.rot_y);
-		printf("Score: %d\n", score);
-		break;
-	case 'q': case 'Q':
-		exit(0);
 		break;
 	case 27:
 		mouseLookEnabled = !mouseLookEnabled;
@@ -614,6 +797,7 @@ void mySpecialKeys(int key, int x, int y)
 		if (TryMove(newX, newZ)) {
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
+			CheckFinnCollision();
 		}
 	}
 	break;
@@ -626,6 +810,7 @@ void mySpecialKeys(int key, int x, int y)
 		if (TryMove(newX, newZ)) {
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
+			CheckFinnCollision();
 		}
 	}
 	break;
@@ -638,6 +823,7 @@ void mySpecialKeys(int key, int x, int y)
 		if (TryMove(newX, newZ)) {
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
+			CheckFinnCollision();
 		}
 	}
 	break;
@@ -650,6 +836,7 @@ void mySpecialKeys(int key, int x, int y)
 		if (TryMove(newX, newZ)) {
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
+			CheckFinnCollision();
 		}
 	}
 	break;
@@ -749,6 +936,149 @@ void LoadAssets()
 	model_candy_kingdom.Load("Models/candy/candyKingdom.obj", "Models/candy/");
 	model_candy_kingdom.scale_xyz = 300.0f;
 	printf("Candy Kingdom Loaded.\n");
+
+	// --- FIRE KINGDOM TEMPLE ---
+	printf("Loading OBJ Model: Fire Kingdom Temple...\n");
+	// Make sure your OBJ filename matches exactly what you have on disk
+	model_fire_temple.Load("Models/firekingdom/temple.obj", "Models/firekingdom/");
+
+	// Load the specific texture from the textures folder
+	tex_fire_temple.Load("Textures/great-temple-of-the-eternal-fire_textured_u1_v1.bmp");
+
+	// Apply texture to all materials in the fire temple model
+	for (auto& entry : model_fire_temple.materials) {
+		entry.second.tex = tex_fire_temple;
+		entry.second.hasTexture = true;
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
+
+	// Scale it BIG
+	model_fire_temple.scale_xyz = 200.0f;
+
+	// Position it - FINAL TESTED VALUES
+	model_fire_temple.pos_x = 0.0f;
+	model_fire_temple.pos_y = 595.0f;  // Final value from testing
+	model_fire_temple.pos_z = 0.0f;
+	
+	// Rotate to flip it right-side up - CORRECT VALUE
+	model_fire_temple.rot_x = -290.0f;  // Correct rotation value found through testing
+	model_fire_temple.rot_y = 0.0f;
+	model_fire_temple.rot_z = 0.0f;
+
+	model_fire_temple.GenerateDisplayList();
+	printf("Fire Temple Loaded.\n");
+
+	// --- GOLEM ---
+	printf("Loading OBJ Model: Golem...\n");
+	model_golem.Load("Models/golem/golem.obj", "Models/golem/");
+	
+	// Load all Golem textures with error checking
+	printf("Loading Golem textures...\n");
+	tex_golem_final.Load("Textures/texturesgolem/????????_????_?????.png");
+	printf("  - Main texture loaded\n");
+	tex_golem_lava_eye.Load("Textures/texturesgolem/LAva_Eye_DIFF.png");
+	printf("  - Lava eye texture loaded\n");
+	tex_golem_em_map.Load("Textures/texturesgolem/EM_MAP.png");
+	printf("  - EM map loaded\n");
+	tex_golem_norma.Load("Textures/texturesgolem/?????_????_?????.jpg");
+	printf("  - Normal map loaded\n");
+	tex_golem_ao.Load("Textures/texturesgolem/?????-????_AO.png");
+	printf("  - AO map loaded\n");
+	tex_golem_podstavka.Load("Textures/texturesgolem/?????????.png");
+	printf("  - Base texture loaded\n");
+	
+	// Debug: Print all material names
+	printf("Golem materials found:\n");
+	for (auto& entry : model_golem.materials) {
+		printf("  - Material: %s\n", entry.first.c_str());
+	}
+	
+	// Apply textures to Golem materials based on material names
+	for (auto& entry : model_golem.materials) {
+		std::string materialName = entry.first;
+		
+		// Apply appropriate texture based on material name
+		if (materialName.find("Eye") != std::string::npos || 
+		    materialName.find("eye") != std::string::npos ||
+		    materialName.find("Lava") != std::string::npos ||
+		    materialName.find("lava") != std::string::npos) {
+			entry.second.tex = tex_golem_lava_eye;
+			entry.second.hasTexture = true;
+			printf("  - Applied lava eye texture to: %s\n", materialName.c_str());
+		}
+		else if (materialName.find("Podstavka") != std::string::npos || 
+		         materialName.find("podstavka") != std::string::npos ||
+		 materialName.find("Base") != std::string::npos ||
+		      materialName.find("base") != std::string::npos) {
+			entry.second.tex = tex_golem_podstavka;
+			entry.second.hasTexture = true;
+			printf("  - Applied base texture to: %s\n", materialName.c_str());
+		}
+		else {
+			// Use main texture for body
+			entry.second.tex = tex_golem_final;
+			entry.second.hasTexture = true;
+			printf("  - Applied main texture to: %s\n", materialName.c_str());
+		}
+		
+		// Ensure proper color for texture display
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
+	
+	// Set Golem size MUCH smaller than BMO (BMO is 10.0, make Golem 2.0)
+	model_golem.scale_xyz = 0.5f;  // Made even smaller (was 2.0f, now 0.5f)
+	
+	// Position Golem next to BMO in Fire Kingdom
+	model_golem.pos_x = -115.0f;  // Near BMO's spawn position (-111.0)
+	model_golem.pos_y = 0.0f;     // Ground level
+	model_golem.pos_z = 2418.0f;  // Near BMO's spawn position (2416.1)
+	
+	// Rotate Golem to face BMO/temple - simplified rotation
+	model_golem.rot_x = 0.0f;     // No pitch rotation
+	model_golem.rot_y = 180.0f;   // Face forward
+	model_golem.rot_z = 0.0f;     // No roll rotation
+	
+	model_golem.GenerateDisplayList();
+	printf("Golem Loaded with textures.\n");
+
+	// --- SKY ---
+	printf("Loading OBJ Model: Sky...\n");
+	model_sky.Load("Models/sky/sky.obj", "Models/sky/");
+	
+	// Load sky texture - BMP format
+	printf("Loading sky texture...\n");
+	tex_sky.Load("Textures/sky.bmp");  // Load sky.bmp
+	printf("  - Sky texture loaded: sky.bmp\n");
+	
+	// Sky is typically very large and encompasses the entire scene
+	model_sky.scale_xyz = 500.0f;  // Very large scale to act as skybox
+	
+	// Center the sky at the origin
+	model_sky.pos_x = 0.0f;
+	model_sky.pos_y = 0.0f;
+	model_sky.pos_z = 0.0f;
+	
+	// No rotation needed
+	model_sky.rot_x = 0.0f;
+	model_sky.rot_y = 0.0f;
+	model_sky.rot_z = 0.0f;
+	
+	// Apply sky texture to all materials or use bright color if no texture
+	for (auto& entry : model_sky.materials) {
+		entry.second.tex = tex_sky;
+		entry.second.hasTexture = true;
+		// Use bright sky blue color as fallback
+		entry.second.diffColor[0] = 0.53f;  // Sky blue R
+		entry.second.diffColor[1] = 0.81f;  // Sky blue G
+		entry.second.diffColor[2] = 0.92f;  // Sky blue B
+	}
+	
+	model_sky.GenerateDisplayList();
+	printf("Sky Loaded.\n");
 
 	// --- CANDY CANE ---
 	printf("Loading OBJ Model: Candy Cane...\n");
@@ -932,6 +1262,8 @@ void myIdle(void)
 	if (isJumping) {
 		model_bmo.pos_y += jumpVelocity;
 		jumpVelocity -= gravity;
+
+		// Floor collision check: Land on Y = 0
 		if (model_bmo.pos_y <= 0.0f) {
 			model_bmo.pos_y = 0.0f;
 			isJumping = false;
