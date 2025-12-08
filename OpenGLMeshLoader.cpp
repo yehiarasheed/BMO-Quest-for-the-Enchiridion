@@ -1,4 +1,4 @@
-#define GLUT_DISABLE_ATEXIT_HACK
+﻿#define GLUT_DISABLE_ATEXIT_HACK
 #include "TextureBuilder.h"
 #include "Model_3DS.h"
 #include "Model_OBJ.h"
@@ -20,6 +20,11 @@ GLdouble aspectRatio = (GLdouble)WIDTH / (GLdouble)HEIGHT;
 GLdouble zNear = 0.1;
 // Increased zFar so we can see the ground when falling from the sky
 GLdouble zFar = 3000;
+// --- SUNLIGHT ANIMATION ---
+float sunAngle = 0.0f;
+float sunIntensity = 1.0f;
+// finn animation
+float finnBounceAngle = 0.0f;
 
 class Vector
 {
@@ -360,9 +365,28 @@ void CheckFinnCollision()
 		jumpVelocity = 0.0f;
 	}
 }
+// Check if BMO is within the red track boundaries
+bool IsWithinTrackBounds(float x, float z)
+{
+	if (currentLevel != LEVEL_CANDY) return true; // No restriction in Fire Kingdom
+
+	// Define red track boundaries (adjust these values based on your track layout)
+	// Example: Track runs from X: 60-90, Z: 40-140
+	float minX = 60.0f;
+	float maxX = 90.0f;
+	float minZ = 40.0f;
+	float maxZ = 140.0f;
+
+	return (x >= minX && x <= maxX && z >= minZ && z <= maxZ);
+}
 
 bool TryMove(float newX, float newZ)
 {
+	// 0. Check Track Boundaries FIRST
+	if (!IsWithinTrackBounds(newX, newZ)) {
+		printf("Cannot move outside track boundaries!\n");
+		return false;
+	}
 	// 1. Check Jelly Obstacle
 	if (CheckJellyCollision(newX, newZ))
 	{
@@ -416,6 +440,7 @@ bool TryMove(float newX, float newZ)
 	return true;
 }
 
+
 void myDisplay(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -466,6 +491,19 @@ void myDisplay(void)
 
 	if (currentLevel == LEVEL_CANDY)
 	{
+		// Animated Sunlight
+		float sunX = 50.0f * cos(sunAngle);
+		float sunY = 80.0f;
+		float sunZ = 50.0f * sin(sunAngle);
+
+		// Color changes from bright white to warm orange
+		float colorShift = 0.5f + 0.5f * sin(sunAngle * 0.5f);
+		GLfloat sunColor[] = { 1.0f, 0.9f - (0.2f * colorShift), 0.7f - (0.3f * colorShift), 1.0f };
+		GLfloat sunPosition[] = { sunX, sunY, sunZ, 1.0f };
+
+		glLightfv(GL_LIGHT0, GL_POSITION, sunPosition);
+		glLightfv(GL_LIGHT0, GL_DIFFUSE, sunColor);
+
 		// --- DRAW SKY (Background) ---
 		glPushMatrix();
 		glDisable(GL_LIGHTING);  // Sky doesn't need lighting
@@ -505,6 +543,15 @@ void myDisplay(void)
 		model_finn.Draw();
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
+		// Finn (The Portal) - with up/down animation
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		glBindTexture(GL_TEXTURE_2D, tex_finn.texture[0]);
+
+		float finnBounce = 0.8f * sin(finnBounceAngle);
+		glTranslatef(model_finn.pos_x, model_finn.pos_y + finnBounce, model_finn.pos_z);
+
 
 		// Cupcakes
 		for (int i = 0; i < NUM_CUPCAKES; i++)
@@ -1068,6 +1115,10 @@ void myReshape(int w, int h)
 	gluLookAt(Eye.x, Eye.y, Eye.z, At.x, At.y, At.z, Up.x, Up.y, Up.z);
 }
 
+
+
+
+
 void LoadAssets()
 {
 	// --- CANDY KINGDOM ---
@@ -1611,6 +1662,10 @@ void myIdle(void)
 		}
 	}
 
+	// Animate Sun
+	sunAngle += 0.003f;  // Slow rotation
+	if (sunAngle >= 6.28318f) sunAngle = 0.0f;  // Reset at 2π
+
 	// Animate Objects
 	cupcakeRotation += 1.0f;
 	if (cupcakeRotation >= 360.0f)
@@ -1624,6 +1679,9 @@ void myIdle(void)
 
 	// Animate Donut (Shake/Bounce)
 	donutShakeAngle += 0.1f;
+
+	// Animate finn
+	finnBounceAngle += 0.05f;
 
 	glutPostRedisplay();
 }
