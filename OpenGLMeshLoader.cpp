@@ -82,6 +82,10 @@ GLTexture tex_golem_ao;
 GLTexture tex_golem_podstavka;
 GLTexture tex_golem_final;
 
+// --- FLAME PRINCESS VARIABLES ---
+Model_OBJ model_flame_princess;
+GLTexture tex_flame_princess;
+
 // --- SKY VARIABLES ---
 Model_OBJ model_sky;
 GLTexture tex_sky;
@@ -635,6 +639,35 @@ void myDisplay(void)
 		model_golem.pos_z = temp_golem_z;
 		
 		glPopMatrix();
+		
+		// --- DRAW FLAME PRINCESS ---
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		
+		// Apply Flame Princess transformations
+		glTranslatef(model_flame_princess.pos_x, model_flame_princess.pos_y, model_flame_princess.pos_z);
+		glRotatef(model_flame_princess.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
+		glRotatef(model_flame_princess.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
+		glRotatef(model_flame_princess.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
+		
+		// Temporarily reset position for proper rendering
+		float temp_fp_x = model_flame_princess.pos_x;
+		float temp_fp_y = model_flame_princess.pos_y;
+		float temp_fp_z = model_flame_princess.pos_z;
+		model_flame_princess.pos_x = 0.0f;
+		model_flame_princess.pos_y = 0.0f;
+		model_flame_princess.pos_z = 0.0f;
+		
+		// Draw Flame Princess
+		model_flame_princess.Draw();
+		
+		// Restore position
+		model_flame_princess.pos_x = temp_fp_x;
+		model_flame_princess.pos_y = temp_fp_y;
+		model_flame_princess.pos_z = temp_fp_z;
+		
+		glPopMatrix();
 	}
 
 	// ============================================
@@ -1045,6 +1078,39 @@ void LoadAssets()
 	model_golem.GenerateDisplayList();
 	printf("Golem Loaded with textures.\n");
 
+	// --- FLAME PRINCESS ---
+	printf("Loading OBJ Model: Flame Princess...\n");
+	model_flame_princess.Load("Models/flameprincess/flameprincess.obj", "Models/flameprincess/");
+	
+	// Load Flame Princess texture (assuming it exists in the textures folder)
+	printf("Loading Flame Princess texture...\n");
+	tex_flame_princess.Load("Textures/flameprincess.bmp");
+	
+	// Apply texture to all materials
+	for (auto& entry : model_flame_princess.materials) {
+		entry.second.tex = tex_flame_princess;
+		entry.second.hasTexture = true;
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
+	
+	// Set Flame Princess to same size as Golem
+	model_flame_princess.scale_xyz = 0.5f;  // Same as Golem
+	
+	// Position Flame Princess next to Golem in Fire Kingdom
+	model_flame_princess.pos_x = -115.0f;  // Next to Golem
+	model_flame_princess.pos_y = 0.0f;     // Ground level
+	model_flame_princess.pos_z = 2422.0f;  // Slightly offset from Golem (Golem is at 2418.0)
+	
+	// Rotate Flame Princess to face forward
+	model_flame_princess.rot_x = 0.0f;
+	model_flame_princess.rot_y = 180.0f;  // Face forward
+	model_flame_princess.rot_z = 0.0f;
+	
+	model_flame_princess.GenerateDisplayList();
+	printf("Flame Princess Loaded.\n");
+
 	// --- SKY ---
 	printf("Loading OBJ Model: Sky...\n");
 	model_sky.Load("Models/sky/sky.obj", "Models/sky/");
@@ -1294,7 +1360,7 @@ void main(int argc, char** argv)
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
 	glutInitWindowSize(WIDTH, HEIGHT);
 	glutInitWindowPosition(100, 150);
-	glutCreateWindow(title);
+ glutCreateWindow(title);
 	printf("Window Created.\n");
 
 	glutDisplayFunc(myDisplay);
