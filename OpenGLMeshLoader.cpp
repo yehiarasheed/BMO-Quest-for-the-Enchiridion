@@ -8,17 +8,32 @@
 #include <stdio.h>
 #include <string>
 
+// --- FMOD INCLUDES ---
+#include <fmod.hpp>
+
 int WIDTH = 1280;
 int HEIGHT = 720;
 
 GLuint tex;
 char title[] = "BMO's Quest";
 
+// --- FMOD GLOBAL VARIABLES ---
+FMOD::System* fmodSystem;
+FMOD::Sound* sndJump;
+FMOD::Sound* sndCollect;
+FMOD::Sound* sndBonk;
+FMOD::Sound* sndLevelWarp;
+FMOD::Sound* sndSparkle;
+FMOD::Sound* sndJellyBounce;
+FMOD::Sound* sndRescue;       // <--- NEW: Rescue sound
+FMOD::Sound* bgmCandy;
+FMOD::Sound* bgmFire;
+FMOD::Channel* channelBGM = 0;
+
 // 3D Projection Options
 GLdouble fovy = 45.0;
 GLdouble aspectRatio = (GLdouble)WIDTH / (GLdouble)HEIGHT;
 GLdouble zNear = 0.1;
-// Increased zFar so we can see the ground when falling from the sky
 GLdouble zFar = 3000;
 
 class Vector
@@ -56,7 +71,9 @@ float cameraHeightOffset = 0.0f;
 Model_OBJ model_candy_kingdom;
 Model_OBJ model_candy_cane;
 Model_OBJ model_bmo;
-Model_OBJ model_finn;
+Model_OBJ model_finn;         // Finn in Candy Kingdom (Portal)
+Model_OBJ model_finn_rescue;  // <--- NEW: Finn in Fire Kingdom (Rescue target)
+bool isFinnRescued = false;   // <--- NEW: Flag to check if rescued
 Model_OBJ model_cupcake;
 
 // --- JELLY VARIABLES ---
@@ -66,7 +83,6 @@ GLTexture tex_jelly;
 // --- DONUT VARIABLES ---
 Model_OBJ model_donut;
 GLTexture tex_donut;
-// Animation for Donut
 float donutShakeAngle = 0.0f;
 
 // --- FIRE KINGDOM VARIABLES ---
@@ -170,6 +186,33 @@ GLTexture tex_coin;
 GLTexture tex_finn;
 GLTexture tex_candy_cane;
 
+// --- FMOD INITIALIZATION ---
+void InitAudio()
+{
+	FMOD_RESULT result;
+	result = FMOD::System_Create(&fmodSystem);
+	fmodSystem->init(32, FMOD_INIT_NORMAL, 0);
+
+	// Load Sound Effects
+	fmodSystem->createSound("Audio/jump.wav", FMOD_DEFAULT, 0, &sndJump);
+	fmodSystem->createSound("Audio/coin.wav", FMOD_DEFAULT, 0, &sndCollect);
+	fmodSystem->createSound("Audio/bonk.wav", FMOD_DEFAULT, 0, &sndBonk);
+	fmodSystem->createSound("Audio/warp.wav", FMOD_DEFAULT, 0, &sndLevelWarp);
+	fmodSystem->createSound("Audio/sparkle.wav", FMOD_DEFAULT, 0, &sndSparkle);
+	fmodSystem->createSound("Audio/jellybounce.wav", FMOD_DEFAULT, 0, &sndJellyBounce);
+
+	// --- LOAD RESCUE SOUND ---
+	fmodSystem->createSound("Audio/rescue.wav", FMOD_DEFAULT, 0, &sndRescue);
+
+	// Load Background Music
+	fmodSystem->createSound("Audio/bgm_candy.mp3", FMOD_LOOP_NORMAL, 0, &bgmCandy);
+	fmodSystem->createSound("Audio/bgm_fire.mp3", FMOD_LOOP_NORMAL, 0, &bgmFire);
+
+	// Start Candy Kingdom Music immediately
+	fmodSystem->playSound(bgmCandy, 0, false, &channelBGM);
+	channelBGM->setVolume(0.4f);
+}
+
 // Render HUD (score)
 void RenderHUD()
 {
@@ -208,6 +251,15 @@ void RenderHUD()
 	glRasterPos2i(x + 12, y + 12);
 	for (char* c = buf; *c != '\0'; ++c)
 		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+
+	// Show Rescue Message
+	if (isFinnRescued) {
+		char rescueMsg[] = "FINN RESCUED!";
+		glColor3f(0.0f, 1.0f, 0.0f);
+		glRasterPos2i(WIDTH / 2 - 50, HEIGHT - 100);
+		for (char* c = rescueMsg; *c != '\0'; ++c)
+			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+	}
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
@@ -261,6 +313,9 @@ void myInit(void)
 	InitMaterial();
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_NORMALIZE);
+
+	// --- INITIALIZE AUDIO ---
+	InitAudio();
 }
 
 bool CheckJellyCollision(float newX, float newZ)
@@ -302,6 +357,10 @@ void CheckCupcakeCollisions()
 		{
 			cupcakeVisible[i] = false;
 			score += CUPCAKE_POINTS;
+
+			// --- PLAY SPARKLE SOUND ---
+			fmodSystem->playSound(sndSparkle, 0, false, 0);
+
 			printf("Cupcake %d collected! Score: %d\n", i + 1, score);
 		}
 	}
@@ -325,6 +384,10 @@ void CheckCoinCollision()
 		{
 			coinVisible[i] = false;
 			score += COIN_POINTS;
+
+			// --- PLAY COIN SOUND ---
+			fmodSystem->playSound(sndCollect, 0, false, 0);
+
 			printf("Coin %d Collected! +%d Points\n", i + 1, COIN_POINTS);
 		}
 	}
@@ -333,31 +396,62 @@ void CheckCoinCollision()
 // --- FINN COLLISION / LEVEL TRANSITION ---
 void CheckFinnCollision()
 {
-	if (currentLevel != LEVEL_CANDY) return;
-
-	float finnRadius = 2.0f;
-	float dx = model_bmo.pos_x - model_finn.pos_x;
-	float dz = model_bmo.pos_z - model_finn.pos_z;
-	float distance = sqrt(dx * dx + dz * dz);
-
-	if (distance < finnRadius)
+	// 1. Level Transition (Candy -> Fire)
+	if (currentLevel == LEVEL_CANDY)
 	{
-		printf(">>> TRAVELING TO FIRE KINGDOM! <<<\n");
-		currentLevel = LEVEL_FIRE;
+		float finnRadius = 2.0f;
+		float dx = model_bmo.pos_x - model_finn.pos_x;
+		float dz = model_bmo.pos_z - model_finn.pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
 
-		// Place BMO on the Fire Kingdom ground - FINAL TESTED VALUES
-		model_bmo.pos_x = -111.0f;   // Final X position from testing
-		model_bmo.pos_z = 2416.1f;   // Final Z position from testing
-		model_bmo.pos_y = 0.0f;      // Ground level
+		if (distance < finnRadius)
+		{
+			printf(">>> TRAVELING TO FIRE KINGDOM! <<<\n");
+			currentLevel = LEVEL_FIRE;
 
-		// Apply final rotation values - TESTED ORIENTATION
-		model_bmo.rot_x = -240.0f;   // X-axis rotation (pitch)
-		model_bmo.rot_y = 329.0f;    // Y-axis rotation (yaw/facing)
-		model_bmo.rot_z = 240.0f;    // Z-axis rotation (roll)
+			// --- PLAY WARP SOUND AND SWITCH MUSIC ---
+			fmodSystem->playSound(sndLevelWarp, 0, false, 0);
 
-		// Ensure physics state is stable on arrival
-		isJumping = false;
-		jumpVelocity = 0.0f;
+			// Switch BGM
+			channelBGM->stop();
+			fmodSystem->playSound(bgmFire, 0, false, &channelBGM);
+			channelBGM->setVolume(0.4f);
+
+			// Place BMO on the Fire Kingdom ground
+			model_bmo.pos_x = -111.0f;
+			model_bmo.pos_z = 2416.1f;
+			model_bmo.pos_y = 0.0f;
+
+			// Apply final rotation values
+			model_bmo.rot_x = -240.0f;
+			model_bmo.rot_y = 329.0f;
+			model_bmo.rot_z = 240.0f;
+
+			// Ensure physics state is stable on arrival
+			isJumping = false;
+			jumpVelocity = 0.0f;
+		}
+	}
+	// 2. Rescue Mission (Fire Kingdom)
+	else if (currentLevel == LEVEL_FIRE)
+	{
+		if (isFinnRescued) return; // Do nothing if already rescued
+
+		float rescueRadius = 3.0f;
+		float dx = model_bmo.pos_x - model_finn_rescue.pos_x;
+		float dz = model_bmo.pos_z - model_finn_rescue.pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
+
+		if (distance < rescueRadius)
+		{
+			isFinnRescued = true;
+			printf(">>> FINN RESCUED! <<<\n");
+
+			// --- PLAY RESCUE SOUND LOUDLY ---
+			FMOD::Channel* sfxChannel = 0;
+			fmodSystem->playSound(sndRescue, 0, false, &sfxChannel);
+			sfxChannel->setVolume(1.0f);
+		}
 	}
 }
 
@@ -383,6 +477,12 @@ bool TryMove(float newX, float newZ)
 		else if (jumpVelocity < 0.0f) {
 			jumpVelocity = jumpStrength * 1.8f;
 		}
+
+		// --- PLAY JELLY BOUNCE SOUND ---
+		FMOD::Channel* sfxChannel = 0;
+		fmodSystem->playSound(sndJellyBounce, 0, false, &sfxChannel);
+		sfxChannel->setVolume(1.0f);
+
 		return false;
 	}
 
@@ -407,6 +507,10 @@ bool TryMove(float newX, float newZ)
 		else if (jumpVelocity < 0.0f) {
 			jumpVelocity = jumpStrength * 1.8f;
 		}
+
+		// --- PLAY BONK SOUND ---
+		fmodSystem->playSound(sndBonk, 0, false, 0);
+
 		printf("Bonk! You hit the Donut.\n");
 		return false;
 	}
@@ -468,23 +572,18 @@ void myDisplay(void)
 	{
 		// --- DRAW SKY (Background) ---
 		glPushMatrix();
-		glDisable(GL_LIGHTING);  // Sky doesn't need lighting
+		glDisable(GL_LIGHTING);
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
-		
-		// Bind sky texture if available
 		if (tex_sky.texture[0] > 0) {
 			glBindTexture(GL_TEXTURE_2D, tex_sky.texture[0]);
 		}
-		
-		// Position sky centered on the camera/world
 		glTranslatef(model_sky.pos_x, model_sky.pos_y, model_sky.pos_z);
 		model_sky.Draw();
-		
 		glBindTexture(GL_TEXTURE_2D, 0);
-		glEnable(GL_LIGHTING);  // Re-enable lighting for other objects
+		glEnable(GL_LIGHTING);
 		glPopMatrix();
-		
+
 		// Draw Candy Kingdom
 		model_candy_kingdom.Draw();
 
@@ -579,40 +678,28 @@ void myDisplay(void)
 	{
 		// --- DRAW SKY (Background) ---
 		glPushMatrix();
-		glDisable(GL_LIGHTING);  // Sky doesn't need lighting
+		glDisable(GL_LIGHTING);
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
-		
-		// Bind sky texture if available
 		if (tex_sky.texture[0] > 0) {
 			glBindTexture(GL_TEXTURE_2D, tex_sky.texture[0]);
 		}
-		
-		// Position sky centered on the camera/world
 		glTranslatef(model_sky.pos_x, model_sky.pos_y, model_sky.pos_z);
 		model_sky.Draw();
-		
 		glBindTexture(GL_TEXTURE_2D, 0);
-		glEnable(GL_LIGHTING);  // Re-enable lighting for other objects
+		glEnable(GL_LIGHTING);
 		glPopMatrix();
-		
+
 		// --- DRAW FIRE KINGDOM TEMPLE ---
 		glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
-
-		// Bind the Fire Temple Texture
 		glBindTexture(GL_TEXTURE_2D, tex_fire_temple.texture[0]);
-
-		// Apply transformations to flip it right-side up
 		glTranslatef(model_fire_temple.pos_x, model_fire_temple.pos_y, model_fire_temple.pos_z);
-		
-		// Apply rotation - X-axis first (flip upside down)
-		glRotatef(model_fire_temple.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis rotation (180 degrees)
-		glRotatef(model_fire_temple.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis rotation
-		glRotatef(model_fire_temple.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis rotation
-		
-		// Temporarily reset position to origin for proper rotation
+		glRotatef(model_fire_temple.rot_x, 1.0f, 0.0f, 0.0f);
+		glRotatef(model_fire_temple.rot_y, 0.0f, 1.0f, 0.0f);
+		glRotatef(model_fire_temple.rot_z, 0.0f, 0.0f, 1.0f);
+
 		float temp_x = model_fire_temple.pos_x;
 		float temp_y = model_fire_temple.pos_y;
 		float temp_z = model_fire_temple.pos_z;
@@ -622,157 +709,153 @@ void myDisplay(void)
 
 		model_fire_temple.Draw();
 
-		// Restore position
 		model_fire_temple.pos_x = temp_x;
 		model_fire_temple.pos_y = temp_y;
 		model_fire_temple.pos_z = temp_z;
 
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
-		
+
 		// --- DRAW GOLEM ---
 		glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
-		
-		// Apply Golem transformations
 		glTranslatef(model_golem.pos_x, model_golem.pos_y, model_golem.pos_z);
-		glRotatef(model_golem.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
-		glRotatef(model_golem.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
-		glRotatef(model_golem.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
-		
-		// Temporarily reset position for proper rendering
+		glRotatef(model_golem.rot_y, 0.0f, 1.0f, 0.0f);
+		glRotatef(model_golem.rot_x, 1.0f, 0.0f, 0.0f);
+		glRotatef(model_golem.rot_z, 0.0f, 0.0f, 1.0f);
+
 		float temp_golem_x = model_golem.pos_x;
 		float temp_golem_y = model_golem.pos_y;
 		float temp_golem_z = model_golem.pos_z;
 		model_golem.pos_x = 0.0f;
 		model_golem.pos_y = 0.0f;
 		model_golem.pos_z = 0.0f;
-		
-		// Draw Golem (it will use its own material textures from the model)
+
 		model_golem.Draw();
-		
-		// Restore position
+
 		model_golem.pos_x = temp_golem_x;
 		model_golem.pos_y = temp_golem_y;
 		model_golem.pos_z = temp_golem_z;
-		
 		glPopMatrix();
-		
+
 		// --- DRAW FLAME PRINCESS ---
 		glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
-		
-		// Apply Flame Princess transformations
 		glTranslatef(model_flame_princess.pos_x, model_flame_princess.pos_y, model_flame_princess.pos_z);
-		glRotatef(model_flame_princess.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
-		glRotatef(model_flame_princess.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
-		glRotatef(model_flame_princess.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
-		
-		// Temporarily reset position for proper rendering
+		glRotatef(model_flame_princess.rot_y, 0.0f, 1.0f, 0.0f);
+		glRotatef(model_flame_princess.rot_x, 1.0f, 0.0f, 0.0f);
+		glRotatef(model_flame_princess.rot_z, 0.0f, 0.0f, 1.0f);
+
 		float temp_fp_x = model_flame_princess.pos_x;
 		float temp_fp_y = model_flame_princess.pos_y;
 		float temp_fp_z = model_flame_princess.pos_z;
 		model_flame_princess.pos_x = 0.0f;
 		model_flame_princess.pos_y = 0.0f;
 		model_flame_princess.pos_z = 0.0f;
-		
-		// Draw Flame Princess
+
 		model_flame_princess.Draw();
-		
-		// Restore position
+
 		model_flame_princess.pos_x = temp_fp_x;
 		model_flame_princess.pos_y = temp_fp_y;
 		model_flame_princess.pos_z = temp_fp_z;
-		
 		glPopMatrix();
-		
+
 		// --- DRAW FIRE ROCK ---
 		glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
-		
-		// Apply Fire Rock transformations
 		glTranslatef(model_fire_rock.pos_x, model_fire_rock.pos_y, model_fire_rock.pos_z);
-		glRotatef(model_fire_rock.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
-		glRotatef(model_fire_rock.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
-		glRotatef(model_fire_rock.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
-		
-		// Temporarily reset position for proper rendering
+		glRotatef(model_fire_rock.rot_y, 0.0f, 1.0f, 0.0f);
+		glRotatef(model_fire_rock.rot_x, 1.0f, 0.0f, 0.0f);
+		glRotatef(model_fire_rock.rot_z, 0.0f, 0.0f, 1.0f);
+
 		float temp_rock_x = model_fire_rock.pos_x;
 		float temp_rock_y = model_fire_rock.pos_y;
 		float temp_rock_z = model_fire_rock.pos_z;
 		model_fire_rock.pos_x = 0.0f;
 		model_fire_rock.pos_y = 0.0f;
 		model_fire_rock.pos_z = 0.0f;
-		
-		// Draw Fire Rock
+
 		model_fire_rock.Draw();
-		
-		// Restore position
+
 		model_fire_rock.pos_x = temp_rock_x;
 		model_fire_rock.pos_y = temp_rock_y;
 		model_fire_rock.pos_z = temp_rock_z;
-		
 		glPopMatrix();
-		
+
 		// --- DRAW ENCHIRIDION ---
 		glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
-		
-		// Apply Enchiridion transformations
 		glTranslatef(model_enchiridion.pos_x, model_enchiridion.pos_y, model_enchiridion.pos_z);
-		glRotatef(model_enchiridion.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
-		glRotatef(model_enchiridion.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
-		glRotatef(model_enchiridion.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
-		
-		// Temporarily reset position for proper rendering
+		glRotatef(model_enchiridion.rot_y, 0.0f, 1.0f, 0.0f);
+		glRotatef(model_enchiridion.rot_x, 1.0f, 0.0f, 0.0f);
+		glRotatef(model_enchiridion.rot_z, 0.0f, 0.0f, 1.0f);
+
 		float temp_ench_x = model_enchiridion.pos_x;
 		float temp_ench_y = model_enchiridion.pos_y;
 		float temp_ench_z = model_enchiridion.pos_z;
 		model_enchiridion.pos_x = 0.0f;
 		model_enchiridion.pos_y = 0.0f;
 		model_enchiridion.pos_z = 0.0f;
-		
-		// Draw Enchiridion
+
 		model_enchiridion.Draw();
-		
-		// Restore position
+
 		model_enchiridion.pos_x = temp_ench_x;
 		model_enchiridion.pos_y = temp_ench_y;
 		model_enchiridion.pos_z = temp_ench_z;
-		
 		glPopMatrix();
-		
+
 		// --- DRAW LAVA HAMMER ---
 		glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
-		
-		// Apply Lava Hammer transformations
 		glTranslatef(model_lava_hammer.pos_x, model_lava_hammer.pos_y, model_lava_hammer.pos_z);
-		glRotatef(model_lava_hammer.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
-		glRotatef(model_lava_hammer.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
-		glRotatef(model_lava_hammer.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
-		
-		// Temporarily reset position for proper rendering
+		glRotatef(model_lava_hammer.rot_y, 0.0f, 1.0f, 0.0f);
+		glRotatef(model_lava_hammer.rot_x, 1.0f, 0.0f, 0.0f);
+		glRotatef(model_lava_hammer.rot_z, 0.0f, 0.0f, 1.0f);
+
 		float temp_hammer_x = model_lava_hammer.pos_x;
 		float temp_hammer_y = model_lava_hammer.pos_y;
 		float temp_hammer_z = model_lava_hammer.pos_z;
 		model_lava_hammer.pos_x = 0.0f;
 		model_lava_hammer.pos_y = 0.0f;
 		model_lava_hammer.pos_z = 0.0f;
-		
-		// Draw Lava Hammer
+
 		model_lava_hammer.Draw();
-		
-		// Restore position
+
 		model_lava_hammer.pos_x = temp_hammer_x;
 		model_lava_hammer.pos_y = temp_hammer_y;
 		model_lava_hammer.pos_z = temp_hammer_z;
-		
+		glPopMatrix();
+
+		// --- DRAW RESCUE FINN (FIRE KINGDOM) ---
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		glBindTexture(GL_TEXTURE_2D, tex_finn.texture[0]);
+
+		glTranslatef(model_finn_rescue.pos_x, model_finn_rescue.pos_y, model_finn_rescue.pos_z);
+		glRotatef(model_finn_rescue.rot_y, 0.0f, 1.0f, 0.0f);
+
+		// Reset for draw
+		float temp_finn_r_x = model_finn_rescue.pos_x;
+		float temp_finn_r_y = model_finn_rescue.pos_y;
+		float temp_finn_r_z = model_finn_rescue.pos_z;
+		model_finn_rescue.pos_x = 0.0f;
+		model_finn_rescue.pos_y = 0.0f;
+		model_finn_rescue.pos_z = 0.0f;
+
+		model_finn_rescue.Draw();
+
+		// Restore
+		model_finn_rescue.pos_x = temp_finn_r_x;
+		model_finn_rescue.pos_y = temp_finn_r_y;
+		model_finn_rescue.pos_z = temp_finn_r_z;
+
+		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
 	}
 
@@ -785,32 +868,29 @@ void myDisplay(void)
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
 		glBindTexture(GL_TEXTURE_2D, tex_bmo.texture[0]);
-		
-		// Apply BMO transformations (position and rotation)
+
 		glTranslatef(model_bmo.pos_x, model_bmo.pos_y, model_bmo.pos_z);
-		glRotatef(model_bmo.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
-		glRotatef(model_bmo.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
-		glRotatef(model_bmo.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
-		
-		// Temporarily reset position to origin for proper rendering
+		glRotatef(model_bmo.rot_y, 0.0f, 1.0f, 0.0f);
+		glRotatef(model_bmo.rot_x, 1.0f, 0.0f, 0.0f);
+		glRotatef(model_bmo.rot_z, 0.0f, 0.0f, 1.0f);
+
 		float temp_bmo_x = model_bmo.pos_x;
 		float temp_bmo_y = model_bmo.pos_y;
 		float temp_bmo_z = model_bmo.pos_z;
 		float temp_bmo_rot_y = model_bmo.rot_y;
-		
+
 		model_bmo.pos_x = 0.0f;
 		model_bmo.pos_y = 0.0f;
 		model_bmo.pos_z = 0.0f;
 		model_bmo.rot_y = 0.0f;
-		
+
 		model_bmo.Draw();
-		
-		// Restore BMO values
+
 		model_bmo.pos_x = temp_bmo_x;
 		model_bmo.pos_y = temp_bmo_y;
 		model_bmo.pos_z = temp_bmo_z;
 		model_bmo.rot_y = temp_bmo_rot_y;
-		
+
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
 	}
@@ -846,7 +926,7 @@ void myKeyboard(unsigned char button, int x, int y)
 		if (TryMove(newX, newZ)) {
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
-			CheckFinnCollision(); // Check for Level Transfer
+			CheckFinnCollision();
 		}
 	}
 	break;
@@ -857,7 +937,7 @@ void myKeyboard(unsigned char button, int x, int y)
 		float newX = model_bmo.pos_x + sin(a) * moveSpeed;
 		float newZ = model_bmo.pos_z - cos(a) * moveSpeed;
 		if (TryMove(newX, newZ)) {
-		CheckCupcakeCollisions();
+			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
 		}
@@ -883,7 +963,7 @@ void myKeyboard(unsigned char button, int x, int y)
 		float newX = model_bmo.pos_x + sin(sAngle) * moveSpeed;
 		float newZ = model_bmo.pos_z - cos(sAngle) * moveSpeed;
 		if (TryMove(newX, newZ)) {
-		 CheckCupcakeCollisions();
+			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
 		}
@@ -893,6 +973,9 @@ void myKeyboard(unsigned char button, int x, int y)
 		if (!isJumping) {
 			isJumping = true;
 			jumpVelocity = jumpStrength;
+
+			// --- PLAY JUMP SOUND ---
+			fmodSystem->playSound(sndJump, 0, false, 0);
 		}
 		break;
 	case 'u': case 'U':
@@ -1024,6 +1107,10 @@ void myMouse(int button, int state, int x, int y)
 		if (!isJumping) {
 			isJumping = true;
 			jumpVelocity = jumpStrength;
+
+			// --- PLAY JUMP SOUND ---
+			fmodSystem->playSound(sndJump, 0, false, 0);
+
 			printf("Jump! (mouse)\n");
 		}
 	}
@@ -1078,13 +1165,8 @@ void LoadAssets()
 
 	// --- FIRE KINGDOM TEMPLE ---
 	printf("Loading OBJ Model: Fire Kingdom Temple...\n");
-	// Make sure your OBJ filename matches exactly what you have on disk
 	model_fire_temple.Load("Models/firekingdom/temple.obj", "Models/firekingdom/");
-
-	// Load the specific texture from the textures folder
 	tex_fire_temple.Load("Textures/great-temple-of-the-eternal-fire_textured_u1_v1.bmp");
-
-	// Apply texture to all materials in the fire temple model
 	for (auto& entry : model_fire_temple.materials) {
 		entry.second.tex = tex_fire_temple;
 		entry.second.hasTexture = true;
@@ -1092,107 +1174,64 @@ void LoadAssets()
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
-
-	// Scale it BIG
 	model_fire_temple.scale_xyz = 200.0f;
-
-	// Position it - FINAL TESTED VALUES
 	model_fire_temple.pos_x = 0.0f;
-	model_fire_temple.pos_y = 595.0f;  // Final value from testing
+	model_fire_temple.pos_y = 595.0f;
 	model_fire_temple.pos_z = 0.0f;
-	
-	// Rotate to flip it right-side up - CORRECT VALUE
-	model_fire_temple.rot_x = -290.0f;  // Correct rotation value found through testing
+	model_fire_temple.rot_x = -290.0f;
 	model_fire_temple.rot_y = 0.0f;
 	model_fire_temple.rot_z = 0.0f;
-
 	model_fire_temple.GenerateDisplayList();
 	printf("Fire Temple Loaded.\n");
 
 	// --- GOLEM ---
 	printf("Loading OBJ Model: Golem...\n");
 	model_golem.Load("Models/golem/golem.obj", "Models/golem/");
-	
-	// Load all Golem textures with new BMP filenames
-	printf("Loading Golem textures...\n");
 	tex_golem_final.Load("Textures/texturesgolem/six.bmp");
-	printf("  - Main texture loaded (six.bmp)\n");
 	tex_golem_lava_eye.Load("Textures/texturesgolem/two.bmp");
-	printf("  - Lava eye texture loaded (two.bmp)\n");
 	tex_golem_em_map.Load("Textures/texturesgolem/one.bmp");
-	printf("  - EM map loaded (one.bmp)\n");
 	tex_golem_norma.Load("Textures/texturesgolem/three.bmp");
-	printf("  - Normal map loaded (three.bmp)\n");
 	tex_golem_ao.Load("Textures/texturesgolem/four.bmp");
-	printf("  - AO map loaded (four.bmp)\n");
 	tex_golem_podstavka.Load("Textures/texturesgolem/five.bmp");
-	printf("  - Base texture loaded (five.bmp)\n");
-	
-	// Debug: Print all material names
-	printf("Golem materials found:\n");
-	for (auto& entry : model_golem.materials) {
-		printf("  - Material: %s\n", entry.first.c_str());
-	}
-	
-	// Apply textures to Golem materials based on material names
+
 	for (auto& entry : model_golem.materials) {
 		std::string materialName = entry.first;
-		
-		// Apply appropriate texture based on material name
-		if (materialName.find("Eye") != std::string::npos || 
-		    materialName.find("eye") != std::string::npos ||
-		    materialName.find("Lava") != std::string::npos ||
-		    materialName.find("lava") != std::string::npos) {
+		if (materialName.find("Eye") != std::string::npos ||
+			materialName.find("eye") != std::string::npos ||
+			materialName.find("Lava") != std::string::npos ||
+			materialName.find("lava") != std::string::npos) {
 			entry.second.tex = tex_golem_lava_eye;
 			entry.second.hasTexture = true;
-			printf("  - Applied lava eye texture to: %s\n", materialName.c_str());
 		}
-		else if (materialName.find("Podstavka") != std::string::npos || 
-		  materialName.find("podstavka") != std::string::npos ||
-		 materialName.find("Base") != std::string::npos ||
-		      materialName.find("base") != std::string::npos) {
+		else if (materialName.find("Podstavka") != std::string::npos ||
+			materialName.find("podstavka") != std::string::npos ||
+			materialName.find("Base") != std::string::npos ||
+			materialName.find("base") != std::string::npos) {
 			entry.second.tex = tex_golem_podstavka;
 			entry.second.hasTexture = true;
-			printf("  - Applied base texture to: %s\n", materialName.c_str());
 		}
 		else {
-			// Use main texture for body
 			entry.second.tex = tex_golem_final;
 			entry.second.hasTexture = true;
-			printf("  - Applied main texture to: %s\n", materialName.c_str());
 		}
-		
-		// Ensure proper color for texture display
 		entry.second.diffColor[0] = 1.0f;
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
-	
-	// Set Golem size MUCH smaller than BMO (BMO is 10.0, make Golem 2.0)
-	model_golem.scale_xyz = 0.5f;  // Made even smaller (was 2.0f, now 0.5f)
-	
-	// Position Golem next to BMO in Fire Kingdom
-	model_golem.pos_x = -115.0f;  // Near BMO's spawn position (-111.0)
-	model_golem.pos_y = 0.0f;     // Ground level
-	model_golem.pos_z = 2418.0f;  // Near BMO's spawn position (2416.1)
-	
-	// Rotate Golem to face BMO/temple - simplified rotation
-	model_golem.rot_x = 0.0f;     // No pitch rotation
-	model_golem.rot_y = 180.0f;   // Face forward
-	model_golem.rot_z = 0.0f;     // No roll rotation
-	
+
+	model_golem.scale_xyz = 0.5f;
+	model_golem.pos_x = -115.0f;
+	model_golem.pos_y = 0.0f;
+	model_golem.pos_z = 2418.0f;
+	model_golem.rot_x = 0.0f;
+	model_golem.rot_y = 180.0f;
+	model_golem.rot_z = 0.0f;
 	model_golem.GenerateDisplayList();
-	printf("Golem Loaded with textures.\n");
+	printf("Golem Loaded.\n");
 
 	// --- FLAME PRINCESS ---
 	printf("Loading OBJ Model: fire Princess...\n");
 	model_flame_princess.Load("Models/firePrincess/firePrincess.obj", "Models/firePrincess/");
-	
-	//// Load Flame Princess texture (assuming it exists in the textures folder)
-	//printf("Loading Flame Princess texture...\n");
-	//tex_flame_princess.Load("Textures/flameprincess.bmp");
-	
-	// Apply texture to all materials
 	for (auto& entry : model_flame_princess.materials) {
 		entry.second.tex = tex_flame_princess;
 		entry.second.hasTexture = true;
@@ -1200,225 +1239,152 @@ void LoadAssets()
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
-	
-	// Set Flame Princess to same size as Golem
-	model_flame_princess.scale_xyz = 0.5f;  // Same as Golem
-	
-	// Position Flame Princess next to Golem in Fire Kingdom
-	model_flame_princess.pos_x = -115.0f;  // Next to Golem
-	model_flame_princess.pos_y = 0.0f;     // Ground level
-	model_flame_princess.pos_z = 2422.0f;  // Slightly offset from Golem (Golem is at 2418.0)
-	
-	// Rotate Flame Princess to face forward
+	model_flame_princess.scale_xyz = 0.5f;
+	model_flame_princess.pos_x = -115.0f;
+	model_flame_princess.pos_y = 0.0f;
+	model_flame_princess.pos_z = 2422.0f;
 	model_flame_princess.rot_x = 0.0f;
-	model_flame_princess.rot_y = 180.0f;  // Face forward
+	model_flame_princess.rot_y = 180.0f;
 	model_flame_princess.rot_z = 0.0f;
-	
 	model_flame_princess.GenerateDisplayList();
 	printf("Flame Princess Loaded.\n");
 
 	// --- FIRE ROCK ---
 	printf("Loading OBJ Model: Fire Rock...\n");
 	model_fire_rock.Load("Models/firerock/firerock.obj", "Models/firerock/");
-	
-	// Load Fire Rock textures
-	printf("Loading Fire Rock textures...\n");
 	tex_fire_rock_20.Load("Textures/texturesrock/rock20_tex00.bmp");
-	printf("  - Rock 20 texture loaded\n");
 	tex_fire_rock_0.Load("Textures/texturesrock/rock0_tex00.bmp");
-	printf("  - Rock 0 texture loaded\n");
-	
-	// Apply textures to Fire Rock materials based on material names
+
 	for (auto& entry : model_fire_rock.materials) {
 		std::string materialName = entry.first;
-		
-		// Apply appropriate texture based on material name
-		if (materialName.find("20") != std::string::npos || 
-		materialName.find("Rock20") != std::string::npos ||
-		    materialName.find("rock20") != std::string::npos) {
+		if (materialName.find("20") != std::string::npos ||
+			materialName.find("Rock20") != std::string::npos ||
+			materialName.find("rock20") != std::string::npos) {
 			entry.second.tex = tex_fire_rock_20;
 			entry.second.hasTexture = true;
-			printf("  - Applied rock20 texture to: %s\n", materialName.c_str());
 		}
-		else if (materialName.find("0") != std::string::npos || 
-		         materialName.find("Rock0") != std::string::npos ||
-		         materialName.find("rock0") != std::string::npos) {
+		else if (materialName.find("0") != std::string::npos ||
+			materialName.find("Rock0") != std::string::npos ||
+			materialName.find("rock0") != std::string::npos) {
 			entry.second.tex = tex_fire_rock_0;
 			entry.second.hasTexture = true;
-			printf("  - Applied rock0 texture to: %s\n", materialName.c_str());
 		}
 		else {
-			// Default to rock20 texture
 			entry.second.tex = tex_fire_rock_20;
 			entry.second.hasTexture = true;
-			printf("  - Applied default rock20 texture to: %s\n", materialName.c_str());
 		}
-		
-		// Ensure proper color for texture display
 		entry.second.diffColor[0] = 1.0f;
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
-	
-	// Set Fire Rock size (similar to Golem)
-	model_fire_rock.scale_xyz = 1.0f;  // Increased from 0.5f to 2.0f for better visibility
-	
-	// Position Fire Rock next to Golem in Fire Kingdom
-	model_fire_rock.pos_x = -118.0f;  // Slightly left of Golem
-	model_fire_rock.pos_y = 0.0f;     // Ground level
-	model_fire_rock.pos_z = 2414.0f;  // Slightly in front of Golem
-	
-	// Rotate Fire Rock
+
+	model_fire_rock.scale_xyz = 1.0f;
+	model_fire_rock.pos_x = -118.0f;
+	model_fire_rock.pos_y = 0.0f;
+	model_fire_rock.pos_z = 2414.0f;
 	model_fire_rock.rot_x = 0.0f;
-	model_fire_rock.rot_y = 45.0f;    // Angled
+	model_fire_rock.rot_y = 45.0f;
 	model_fire_rock.rot_z = 0.0f;
-	
 	model_fire_rock.GenerateDisplayList();
 	printf("Fire Rock Loaded.\n");
 
 	// --- ENCHIRIDION ---
 	printf("Loading OBJ Model: Enchiridion...\n");
 	model_enchiridion.Load("Models/enchiridion/enchiridion.obj", "Models/enchiridion/");
-	
-	// Load Enchiridion textures
-	printf("Loading Enchiridion textures...\n");
 	tex_enchiridion_01.Load("Textures/texturesenchiridion/enchiridion_tex_map_01.bmp");
-	printf("  - Enchiridion texture 01 loaded\n");
 	tex_enchiridion_02.Load("Textures/texturesenchiridion/enchiridion_tex_map_02.bmp");
-	printf("  - Enchiridion texture 02 loaded\n");
 	tex_enchiridion_paper.Load("Textures/texturesenchiridion/LT_AntiquePaper_03.bmp");
-	printf("  - Antique paper texture loaded\n");
-	
-	// Apply textures to Enchiridion materials based on material names
+
 	for (auto& entry : model_enchiridion.materials) {
 		std::string materialName = entry.first;
-		
-		// Apply appropriate texture based on material name
-		if (materialName.find("01") != std::string::npos || 
-		    materialName.find("_01") != std::string::npos ||
-		    materialName.find("Map01") != std::string::npos) {
+		if (materialName.find("01") != std::string::npos ||
+			materialName.find("_01") != std::string::npos ||
+			materialName.find("Map01") != std::string::npos) {
 			entry.second.tex = tex_enchiridion_01;
 			entry.second.hasTexture = true;
-			printf("  - Applied enchiridion_01 texture to: %s\n", materialName.c_str());
 		}
-		else if (materialName.find("02") != std::string::npos || 
-		      materialName.find("_02") != std::string::npos ||
-		         materialName.find("Map02") != std::string::npos) {
+		else if (materialName.find("02") != std::string::npos ||
+			materialName.find("_02") != std::string::npos ||
+			materialName.find("Map02") != std::string::npos) {
 			entry.second.tex = tex_enchiridion_02;
 			entry.second.hasTexture = true;
-			printf("  - Applied enchiridion_02 texture to: %s\n", materialName.c_str());
 		}
-		else if (materialName.find("Paper") != std::string::npos || 
-		   materialName.find("paper") != std::string::npos ||
-		       materialName.find("Antique") != std::string::npos) {
+		else if (materialName.find("Paper") != std::string::npos ||
+			materialName.find("paper") != std::string::npos ||
+			materialName.find("Antique") != std::string::npos) {
 			entry.second.tex = tex_enchiridion_paper;
 			entry.second.hasTexture = true;
-			printf("  - Applied paper texture to: %s\n", materialName.c_str());
 		}
 		else {
-			// Default to texture 01
-		 entry.second.tex = tex_enchiridion_01;
+			entry.second.tex = tex_enchiridion_01;
 			entry.second.hasTexture = true;
-			printf("  - Applied default enchiridion_01 texture to: %s\n", materialName.c_str());
 		}
-		
-		// Ensure proper color for texture display
 		entry.second.diffColor[0] = 1.0f;
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
-	
-	// Set Enchiridion size (smaller than Golem)
-	model_enchiridion.scale_xyz = 1.5f;  // Increased from 0.3f to 1.5f for better visibility
-	
-	// Position Enchiridion next to Golem in Fire Kingdom (on a rock or pedestal-like position)
-	model_enchiridion.pos_x = -112.0f;  // Right of Golem
-	model_enchiridion.pos_y = 1.0f;     // Slightly elevated (on a pedestal/rock)
-	model_enchiridion.pos_z = 2420.0f;  // Next to Golem
-	
+
+	model_enchiridion.scale_xyz = 1.5f;
+	model_enchiridion.pos_x = -112.0f;
+	model_enchiridion.pos_y = 1.0f;
+	model_enchiridion.pos_z = 2420.0f;
 	model_enchiridion.GenerateDisplayList();
 	printf("Enchiridion Loaded.\n");
 
 	// --- LAVA HAMMER ---
 	printf("Loading OBJ Model: Lava Hammer...\n");
 	model_lava_hammer.Load("Models/lavahammer/lavahammer.obj", "Models/lavahammer/");
-	
-	// Load Lava Hammer textures
-	printf("Loading Lava Hammer textures...\n");
 	tex_lava_hammer_base.Load("Textures/textureslavahammer/phong1SG_Base_color.bmp");
-	printf("  - Base color texture loaded\n");
 	tex_lava_hammer_emissive.Load("Textures/textureslavahammer/phong1SG_Emissive.bmp");
-	printf("  - Emissive texture loaded\n");
 	tex_lava_hammer_roughness.Load("Textures/textureslavahammer/phong1SG_Roughness.bmp");
-	printf("  - Roughness texture loaded\n");
 	tex_lava_hammer_metallic.Load("Textures/textureslavahammer/phong1SG_Metallic.bmp");
-	printf("  - Metallic texture loaded\n");
 	tex_lava_hammer_normal.Load("Textures/textureslavahammer/phong1SG_Normal_OpenGL.bmp");
-	printf("  - Normal texture loaded\n");
-	
-	// Apply textures to Lava Hammer materials based on material names
+
 	for (auto& entry : model_lava_hammer.materials) {
 		std::string materialName = entry.first;
-		
-		// Apply appropriate texture based on material name
-		if (materialName.find("Emissive") != std::string::npos || 
-		    materialName.find("emissive") != std::string::npos ||
-		    materialName.find("Glow") != std::string::npos) {
+		if (materialName.find("Emissive") != std::string::npos ||
+			materialName.find("emissive") != std::string::npos ||
+			materialName.find("Glow") != std::string::npos) {
 			entry.second.tex = tex_lava_hammer_emissive;
 			entry.second.hasTexture = true;
-			printf("  - Applied emissive texture to: %s\n", materialName.c_str());
 		}
-		else if (materialName.find("Metal") != std::string::npos || 
-		         materialName.find("metal") != std::string::npos) {
+		else if (materialName.find("Metal") != std::string::npos ||
+			materialName.find("metal") != std::string::npos) {
 			entry.second.tex = tex_lava_hammer_metallic;
 			entry.second.hasTexture = true;
-			printf("  - Applied metallic texture to: %s\n", materialName.c_str());
 		}
-		else if (materialName.find("Rough") != std::string::npos || 
-		         materialName.find("rough") != std::string::npos) {
+		else if (materialName.find("Rough") != std::string::npos ||
+			materialName.find("rough") != std::string::npos) {
 			entry.second.tex = tex_lava_hammer_roughness;
 			entry.second.hasTexture = true;
-			printf("  - Applied roughness texture to: %s\n", materialName.c_str());
 		}
-		else if (materialName.find("Normal") != std::string::npos || 
-		   materialName.find("normal") != std::string::npos) {
+		else if (materialName.find("Normal") != std::string::npos ||
+			materialName.find("normal") != std::string::npos) {
 			entry.second.tex = tex_lava_hammer_normal;
 			entry.second.hasTexture = true;
-			printf("  - Applied normal texture to: %s\n", materialName.c_str());
 		}
 		else {
-			// Default to base color texture
 			entry.second.tex = tex_lava_hammer_base;
 			entry.second.hasTexture = true;
-			printf("  - Applied base color texture to: %s\n", materialName.c_str());
 		}
-		
-		// Ensure proper color for texture display
 		entry.second.diffColor[0] = 1.0f;
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
-	
-	// Set Lava Hammer size (similar to Fire Rock)
-	model_lava_hammer.scale_xyz = 1.0f;  // Same as Fire Rock
-	
-	// Position Lava Hammer in Fire Kingdom - placed to avoid covering other objects
-	model_lava_hammer.pos_x = -108.0f;  // Right side, away from other models
-	model_lava_hammer.pos_y = 0.0f;   // Ground level
-	model_lava_hammer.pos_z = 2416.0f;  // Aligned with Golem's Z position
-	
-	// Rotate Lava Hammer for interesting angle
+
+	model_lava_hammer.scale_xyz = 1.0f;
+	model_lava_hammer.pos_x = -108.0f;
+	model_lava_hammer.pos_y = 0.0f;
+	model_lava_hammer.pos_z = 2416.0f;
 	model_lava_hammer.rot_x = 0.0f;
-	model_lava_hammer.rot_y = -30.0f;   // Angled slightly
+	model_lava_hammer.rot_y = -30.0f;
 	model_lava_hammer.rot_z = 0.0f;
-	
 	model_lava_hammer.GenerateDisplayList();
 	printf("Lava Hammer Loaded.\n");
 
 	// --- SKY ---
 	model_sky.GenerateDisplayList();
 	printf("Sky Loaded.\n");
-
 
 	// --- CANDY CANE ---
 	printf("Loading OBJ Model: Candy Cane...\n");
@@ -1488,23 +1454,17 @@ void LoadAssets()
 	// --- DONUT ---
 	printf("Loading OBJ Model: Donut...\n");
 	model_donut.Load("Models/donut/donut.obj", "Models/donut/");
-
-	// Load the orange/dough texture
 	tex_donut.Load("Textures/donut.bmp");
 
 	for (auto& entry : model_donut.materials) {
 		std::string name = entry.first;
-
-		// If material name contains Icing, turn off texture and make it brown
 		if (name.find("Icing") != std::string::npos || name.find("icing") != std::string::npos || name.find("Material.002") != std::string::npos)
 		{
 			entry.second.hasTexture = false;
-			// Chocolate Color
 			entry.second.diffColor[0] = 0.36f;
 			entry.second.diffColor[1] = 0.20f;
 			entry.second.diffColor[2] = 0.09f;
 		}
-		// Sprinkles (disable texture, make colorful)
 		else if (name.find("Sprinkle") != std::string::npos || name.find("sprinkle") != std::string::npos)
 		{
 			entry.second.hasTexture = false;
@@ -1512,12 +1472,10 @@ void LoadAssets()
 			entry.second.diffColor[1] = 0.0f;
 			entry.second.diffColor[2] = 0.0f;
 		}
-		// Dough (keep texture)
 		else
 		{
 			entry.second.tex = tex_donut;
 			entry.second.hasTexture = true;
-			// Reset color to white so texture shows
 			entry.second.diffColor[0] = 1.0f;
 			entry.second.diffColor[1] = 1.0f;
 			entry.second.diffColor[2] = 1.0f;
@@ -1555,8 +1513,8 @@ void LoadAssets()
 	}
 	printf("Coins Loaded.\n");
 
-	// --- FINN ---
-	printf("Loading OBJ Model: Finn...\n");
+	// --- FINN (Candy) ---
+	printf("Loading OBJ Model: Finn (Candy)...\n");
 	model_finn.Load("Models/finn/Finn.obj", "Models/finn/");
 	tex_finn.Load("Textures/finn.bmp");
 
@@ -1575,6 +1533,27 @@ void LoadAssets()
 	model_finn.rot_y = -90.0f;
 
 	model_finn.GenerateDisplayList();
+
+	// --- FINN (Fire Rescue) ---
+	printf("Loading OBJ Model: Finn (Fire Rescue)...\n");
+	model_finn_rescue.Load("Models/finn/Finn.obj", "Models/finn/"); // Reuse OBJ
+	// Reuse texture settings
+	for (auto& entry : model_finn_rescue.materials) {
+		entry.second.tex = tex_finn;
+		entry.second.hasTexture = true;
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
+	// Position him in Fire Kingdom
+	model_finn_rescue.scale_xyz = 0.1f;
+	model_finn_rescue.pos_x = -105.0f;
+	model_finn_rescue.pos_y = 0.0f;
+	model_finn_rescue.pos_z = 2430.0f;
+	model_finn_rescue.rot_y = 45.0f;
+
+	model_finn_rescue.GenerateDisplayList();
+
 	printf("Finn Ready.\n");
 
 	// --- JELLY ---
@@ -1625,6 +1604,9 @@ void myIdle(void)
 	// Animate Donut (Shake/Bounce)
 	donutShakeAngle += 0.1f;
 
+	// --- UPDATE FMOD ---
+	fmodSystem->update();
+
 	glutPostRedisplay();
 }
 
@@ -1634,7 +1616,7 @@ void main(int argc, char** argv)
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
 	glutInitWindowSize(WIDTH, HEIGHT);
 	glutInitWindowPosition(100, 150);
- glutCreateWindow(title);
+	glutCreateWindow(title);
 	printf("Window Created.\n");
 
 	glutDisplayFunc(myDisplay);
