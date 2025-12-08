@@ -97,6 +97,14 @@ GLTexture tex_enchiridion_01;
 GLTexture tex_enchiridion_02;
 GLTexture tex_enchiridion_paper;
 
+// --- LAVA HAMMER VARIABLES ---
+Model_OBJ model_lava_hammer;
+GLTexture tex_lava_hammer_base;
+GLTexture tex_lava_hammer_emissive;
+GLTexture tex_lava_hammer_roughness;
+GLTexture tex_lava_hammer_metallic;
+GLTexture tex_lava_hammer_normal;
+
 // --- SKY VARIABLES ---
 Model_OBJ model_sky;
 GLTexture tex_sky;
@@ -737,6 +745,35 @@ void myDisplay(void)
 		model_enchiridion.pos_z = temp_ench_z;
 		
 		glPopMatrix();
+		
+		// --- DRAW LAVA HAMMER ---
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		
+		// Apply Lava Hammer transformations
+		glTranslatef(model_lava_hammer.pos_x, model_lava_hammer.pos_y, model_lava_hammer.pos_z);
+		glRotatef(model_lava_hammer.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
+		glRotatef(model_lava_hammer.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
+		glRotatef(model_lava_hammer.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
+		
+		// Temporarily reset position for proper rendering
+		float temp_hammer_x = model_lava_hammer.pos_x;
+		float temp_hammer_y = model_lava_hammer.pos_y;
+		float temp_hammer_z = model_lava_hammer.pos_z;
+		model_lava_hammer.pos_x = 0.0f;
+		model_lava_hammer.pos_y = 0.0f;
+		model_lava_hammer.pos_z = 0.0f;
+		
+		// Draw Lava Hammer
+		model_lava_hammer.Draw();
+		
+		// Restore position
+		model_lava_hammer.pos_x = temp_hammer_x;
+		model_lava_hammer.pos_y = temp_hammer_y;
+		model_lava_hammer.pos_z = temp_hammer_z;
+		
+		glPopMatrix();
 	}
 
 	// ============================================
@@ -1280,7 +1317,7 @@ void LoadAssets()
 		}
 		else {
 			// Default to texture 01
-			entry.second.tex = tex_enchiridion_01;
+		 entry.second.tex = tex_enchiridion_01;
 			entry.second.hasTexture = true;
 			printf("  - Applied default enchiridion_01 texture to: %s\n", materialName.c_str());
 		}
@@ -1302,40 +1339,86 @@ void LoadAssets()
 	model_enchiridion.GenerateDisplayList();
 	printf("Enchiridion Loaded.\n");
 
-	// --- SKY ---
-	printf("Loading OBJ Model: Sky...\n");
-	model_sky.Load("Models/sky/sky.obj", "Models/sky/");
+	// --- LAVA HAMMER ---
+	printf("Loading OBJ Model: Lava Hammer...\n");
+	model_lava_hammer.Load("Models/lavahammer/lavahammer.obj", "Models/lavahammer/");
 	
-	// Load sky texture - BMP format
-	printf("Loading sky texture...\n");
-	tex_sky.Load("Textures/sky.bmp");  // Load sky.bmp
-	printf("  - Sky texture loaded: sky.bmp\n");
+	// Load Lava Hammer textures
+	printf("Loading Lava Hammer textures...\n");
+	tex_lava_hammer_base.Load("Textures/textureslavahammer/phong1SG_Base_color.bmp");
+	printf("  - Base color texture loaded\n");
+	tex_lava_hammer_emissive.Load("Textures/textureslavahammer/phong1SG_Emissive.bmp");
+	printf("  - Emissive texture loaded\n");
+	tex_lava_hammer_roughness.Load("Textures/textureslavahammer/phong1SG_Roughness.bmp");
+	printf("  - Roughness texture loaded\n");
+	tex_lava_hammer_metallic.Load("Textures/textureslavahammer/phong1SG_Metallic.bmp");
+	printf("  - Metallic texture loaded\n");
+	tex_lava_hammer_normal.Load("Textures/textureslavahammer/phong1SG_Normal_OpenGL.bmp");
+	printf("  - Normal texture loaded\n");
 	
-	// Sky is typically very large and encompasses the entire scene
-	model_sky.scale_xyz = 500.0f;  // Very large scale to act as skybox
-	
-	// Center the sky at the origin
-	model_sky.pos_x = 0.0f;
-	model_sky.pos_y = 0.0f;
-	model_sky.pos_z = 0.0f;
-	
-	// No rotation needed
-	model_sky.rot_x = 0.0f;
-	model_sky.rot_y = 0.0f;
-	model_sky.rot_z = 0.0f;
-	
-	// Apply sky texture to all materials or use bright color if no texture
-	for (auto& entry : model_sky.materials) {
-		entry.second.tex = tex_sky;
-		entry.second.hasTexture = true;
-		// Use bright sky blue color as fallback
-		entry.second.diffColor[0] = 0.53f;  // Sky blue R
-		entry.second.diffColor[1] = 0.81f;  // Sky blue G
-		entry.second.diffColor[2] = 0.92f;  // Sky blue B
+	// Apply textures to Lava Hammer materials based on material names
+	for (auto& entry : model_lava_hammer.materials) {
+		std::string materialName = entry.first;
+		
+		// Apply appropriate texture based on material name
+		if (materialName.find("Emissive") != std::string::npos || 
+		    materialName.find("emissive") != std::string::npos ||
+		    materialName.find("Glow") != std::string::npos) {
+			entry.second.tex = tex_lava_hammer_emissive;
+			entry.second.hasTexture = true;
+			printf("  - Applied emissive texture to: %s\n", materialName.c_str());
+		}
+		else if (materialName.find("Metal") != std::string::npos || 
+		         materialName.find("metal") != std::string::npos) {
+			entry.second.tex = tex_lava_hammer_metallic;
+			entry.second.hasTexture = true;
+			printf("  - Applied metallic texture to: %s\n", materialName.c_str());
+		}
+		else if (materialName.find("Rough") != std::string::npos || 
+		         materialName.find("rough") != std::string::npos) {
+			entry.second.tex = tex_lava_hammer_roughness;
+			entry.second.hasTexture = true;
+			printf("  - Applied roughness texture to: %s\n", materialName.c_str());
+		}
+		else if (materialName.find("Normal") != std::string::npos || 
+		   materialName.find("normal") != std::string::npos) {
+			entry.second.tex = tex_lava_hammer_normal;
+			entry.second.hasTexture = true;
+			printf("  - Applied normal texture to: %s\n", materialName.c_str());
+		}
+		else {
+			// Default to base color texture
+			entry.second.tex = tex_lava_hammer_base;
+			entry.second.hasTexture = true;
+			printf("  - Applied base color texture to: %s\n", materialName.c_str());
+		}
+		
+		// Ensure proper color for texture display
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
 	}
 	
+	// Set Lava Hammer size (similar to Fire Rock)
+	model_lava_hammer.scale_xyz = 1.0f;  // Same as Fire Rock
+	
+	// Position Lava Hammer in Fire Kingdom - placed to avoid covering other objects
+	model_lava_hammer.pos_x = -108.0f;  // Right side, away from other models
+	model_lava_hammer.pos_y = 0.0f;   // Ground level
+	model_lava_hammer.pos_z = 2416.0f;  // Aligned with Golem's Z position
+	
+	// Rotate Lava Hammer for interesting angle
+	model_lava_hammer.rot_x = 0.0f;
+	model_lava_hammer.rot_y = -30.0f;   // Angled slightly
+	model_lava_hammer.rot_z = 0.0f;
+	
+	model_lava_hammer.GenerateDisplayList();
+	printf("Lava Hammer Loaded.\n");
+
+	// --- SKY ---
 	model_sky.GenerateDisplayList();
 	printf("Sky Loaded.\n");
+
 
 	// --- CANDY CANE ---
 	printf("Loading OBJ Model: Candy Cane...\n");
