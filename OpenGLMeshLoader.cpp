@@ -41,6 +41,9 @@ GLdouble aspectRatio = (GLdouble)WIDTH / (GLdouble)HEIGHT;
 GLdouble zNear = 0.1;
 GLdouble zFar = 3000;
 
+//finn bounce animation
+float finnBounceAngle = 0.0f;
+
 class Vector
 {
 public:
@@ -772,14 +775,37 @@ void myDisplay(void)
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
 
-		// Finn (The Portal)
-		glPushMatrix();
+		// Finn(The Portal) - with up / down animation
+			glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
 		glBindTexture(GL_TEXTURE_2D, tex_finn.texture[0]);
+
+		float finnBounce = fabs(0.8f * sin(finnBounceAngle));
+		glTranslatef(model_finn.pos_x, model_finn.pos_y + finnBounce, model_finn.pos_z);
+		glRotatef(model_finn.rot_y, 0.0f, 1.0f, 0.0f);
+
+		// Temporarily reset to draw properly
+		float temp_finn_x = model_finn.pos_x;
+		float temp_finn_y = model_finn.pos_y;
+		float temp_finn_z = model_finn.pos_z;
+		float temp_finn_rot_y = model_finn.rot_y;
+
+		model_finn.pos_x = 0.0f;
+		model_finn.pos_y = 0.0f;
+		model_finn.pos_z = 0.0f;
+		model_finn.rot_y = 0.0f;
+
 		model_finn.Draw();
+		// Restore
+		model_finn.pos_x = temp_finn_x;
+		model_finn.pos_y = temp_finn_y;
+		model_finn.pos_z = temp_finn_z;
+		model_finn.rot_y = temp_finn_rot_y;
+
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
+
 
 		// Cupcakes
 		for (int i = 0; i < NUM_CUPCAKES; i++)
@@ -996,16 +1022,21 @@ void myDisplay(void)
 		glColor3f(1.0f, 1.0f, 1.0f);
 		glBindTexture(GL_TEXTURE_2D, tex_finn.texture[0]);
 
-		glTranslatef(model_finn_rescue.pos_x, model_finn_rescue.pos_y, model_finn_rescue.pos_z);
+		// Add same bounce animation as Candy Kingdom Finn
+		float finnBounce = fabs(0.8f * sin(finnBounceAngle));
+		glTranslatef(model_finn_rescue.pos_x, model_finn_rescue.pos_y + finnBounce, model_finn_rescue.pos_z);
 		glRotatef(model_finn_rescue.rot_y, 0.0f, 1.0f, 0.0f);
 
 		// Reset for draw
 		float temp_finn_r_x = model_finn_rescue.pos_x;
 		float temp_finn_r_y = model_finn_rescue.pos_y;
 		float temp_finn_r_z = model_finn_rescue.pos_z;
+		float temp_finn_r_rot_y = model_finn_rescue.rot_y;
+
 		model_finn_rescue.pos_x = 0.0f;
 		model_finn_rescue.pos_y = 0.0f;
 		model_finn_rescue.pos_z = 0.0f;
+		model_finn_rescue.rot_y = 0.0f;
 
 		model_finn_rescue.Draw();
 
@@ -1013,6 +1044,7 @@ void myDisplay(void)
 		model_finn_rescue.pos_x = temp_finn_r_x;
 		model_finn_rescue.pos_y = temp_finn_r_y;
 		model_finn_rescue.pos_z = temp_finn_r_z;
+		model_finn_rescue.rot_y = temp_finn_r_rot_y;
 
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
@@ -1239,7 +1271,7 @@ void mySpecialKeys(int key, int x, int y)
 
 void myMotion(int x, int y)
 {
-	if (!mouseLookEnabled) return;
+	if (!mouseRotationEnabled) return;
 
 	if (firstMouse) {
 		lastMouseX = x;
@@ -1777,6 +1809,9 @@ void myIdle(void)
 
 	// Animate Donut (Shake/Bounce)
 	donutShakeAngle += 0.1f;
+
+	// Animate finn
+	finnBounceAngle += 0.05f;
 
 	// --- UPDATE FMOD ---
 	fmodSystem->update();
