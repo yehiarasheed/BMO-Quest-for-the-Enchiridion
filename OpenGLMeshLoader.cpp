@@ -146,7 +146,7 @@ const float gravity = 0.03f;
 // Mouse control
 int lastMouseX = -1;
 int lastMouseY = -1;
-bool mouseRotationEnabled = false;
+bool mouseRotationEnabled = true;
 float mouseSensitivity = 0.2f;
 
 // FPS-style mouse look
@@ -985,7 +985,7 @@ void mySpecialKeys(int key, int x, int y)
 
 void myMotion(int x, int y)
 {
-	if (!mouseRotationEnabled) return;
+	if (!mouseLookEnabled) return;
 
 	if (firstMouse) {
 		lastMouseX = x;
