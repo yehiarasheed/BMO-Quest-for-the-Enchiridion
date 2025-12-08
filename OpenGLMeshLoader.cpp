@@ -26,9 +26,14 @@ FMOD::Sound* sndLevelWarp;
 FMOD::Sound* sndSparkle;
 FMOD::Sound* sndJellyBounce;
 FMOD::Sound* sndRescue;       // <--- NEW: Rescue sound
+FMOD::Sound* sndCane;         // <--- NEW: Candy cane collision sound
 FMOD::Sound* bgmCandy;
 FMOD::Sound* bgmFire;
 FMOD::Channel* channelBGM = 0;
+
+// Game state flags
+bool enchiridionFound = false;
+bool gameFinished = false;
 
 // 3D Projection Options
 GLdouble fovy = 45.0;
@@ -48,7 +53,9 @@ public:
 		y += value;
 		z += value;
 	}
+	
 };
+	
 
 Vector Eye(20, 5, 20);
 Vector At(0, 0, 0);
@@ -204,6 +211,9 @@ void InitAudio()
 	// --- LOAD RESCUE SOUND ---
 	fmodSystem->createSound("Audio/rescue.wav", FMOD_DEFAULT, 0, &sndRescue);
 
+    // --- LOAD CANDY CANE SOUND ---
+    fmodSystem->createSound("Audio/candycane.wav", FMOD_DEFAULT, 0, &sndCane);
+
 	// Load Background Music
 	fmodSystem->createSound("Audio/bgm_candy.mp3", FMOD_LOOP_NORMAL, 0, &bgmCandy);
 	fmodSystem->createSound("Audio/bgm_fire.mp3", FMOD_LOOP_NORMAL, 0, &bgmFire);
@@ -211,6 +221,31 @@ void InitAudio()
 	// Start Candy Kingdom Music immediately
 	fmodSystem->playSound(bgmCandy, 0, false, &channelBGM);
 	channelBGM->setVolume(0.4f);
+}
+
+// --- ENCHIRIDION COLLISION / GAME FINISH ---
+void CheckEnchiridionCollision()
+{
+    if (currentLevel != LEVEL_FIRE) return;
+    if (enchiridionFound) return;
+
+    float enchRadius = 3.0f;
+    float dx = model_bmo.pos_x - model_enchiridion.pos_x;
+    float dz = model_bmo.pos_z - model_enchiridion.pos_z;
+    float distance = sqrt(dx * dx + dz * dz);
+
+    if (distance < enchRadius)
+    {
+        enchiridionFound = true;
+        gameFinished = true;
+        printf(">>> ENCHIRIDION FOUND! FINAL SCORE: %d <<<\n", score);
+
+        // Play rescue sound and stop background music
+        FMOD::Channel* sfxChannel = 0;
+        fmodSystem->playSound(sndRescue, 0, false, &sfxChannel);
+        if (sfxChannel) sfxChannel->setVolume(1.0f);
+        if (channelBGM) channelBGM->stop();
+    }
 }
 
 // Render HUD (score)
@@ -260,6 +295,17 @@ void RenderHUD()
 		for (char* c = rescueMsg; *c != '\0'; ++c)
 			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
 	}
+
+    // Show Enchiridion / Final Message
+    if (enchiridionFound)
+    {
+        char finalMsg[128];
+        sprintf(finalMsg, "ENCHIRIDION FOUND! FINAL SCORE: %d", score);
+        glColor3f(1.0f, 0.8f, 0.0f);
+        glRasterPos2i(WIDTH / 2 - 120, HEIGHT - 70);
+        for (char* c = finalMsg; *c != '\0'; ++c)
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
@@ -339,6 +385,21 @@ bool CheckDonutCollision(float newX, float newZ)
 	float dz = newZ - model_donut.pos_z;
 	float distance = sqrt(dx * dx + dz * dz);
 	return (distance < donutRadius);
+}
+
+// Strict candy cane collision: very small radius representing the model itself
+bool CheckCandyCaneCollision(float newX, float newZ)
+{
+    if (currentLevel != LEVEL_CANDY) return false;
+
+    // Strict radius representing the candy cane model itself (world units)
+    float caneRadius = 1.85f;
+
+    float dx = newX - model_candy_cane.pos_x;
+    float dz = newZ - model_candy_cane.pos_z;
+    float distance = sqrt(dx * dx + dz * dz);
+
+    return (distance < caneRadius);
 }
 
 void CheckCupcakeCollisions()
@@ -457,6 +518,15 @@ void CheckFinnCollision()
 
 bool TryMove(float newX, float newZ)
 {
+    // Candy cane strict collision: prevent entering its exact space
+    if (CheckCandyCaneCollision(newX, newZ)) {
+        // Play cane sound and apply heavier penalty
+        fmodSystem->playSound(sndCane, 0, false, 0);
+		score -= 10; // cane penalty
+        if (score < 0) score = 0;
+        printf("Ouch! You hit the Candy Cane. -15 points. Score: %d\n", score);
+        return false;
+    }
 	// 1. Check Jelly Obstacle
 	if (CheckJellyCollision(newX, newZ))
 	{
@@ -481,7 +551,12 @@ bool TryMove(float newX, float newZ)
 		// --- PLAY JELLY BOUNCE SOUND ---
 		FMOD::Channel* sfxChannel = 0;
 		fmodSystem->playSound(sndJellyBounce, 0, false, &sfxChannel);
-		sfxChannel->setVolume(1.0f);
+		if (sfxChannel) sfxChannel->setVolume(1.0f);
+
+		// small penalty for hitting jelly
+		score -= 5;
+		if (score < 0) score = 0;
+		printf("Bounced by Jelly! -5 points. Score: %d\n", score);
 
 		return false;
 	}
@@ -510,6 +585,11 @@ bool TryMove(float newX, float newZ)
 
 		// --- PLAY BONK SOUND ---
 		fmodSystem->playSound(sndBonk, 0, false, 0);
+
+		// medium penalty for donut
+		score -= 8;
+		if (score < 0) score = 0;
+		printf("Bonk! You hit the Donut. -8 points. Score: %d\n", score);
 
 		printf("Bonk! You hit the Donut.\n");
 		return false;
@@ -901,6 +981,8 @@ void myDisplay(void)
 
 void myKeyboard(unsigned char button, int x, int y)
 {
+    if (gameFinished) return; // ignore input after finishing
+
 	float moveSpeed = 2.0f;
 	float rotSpeed = 5.0f;
 	float angle = model_bmo.rot_y * 3.14159 / 180.0;
@@ -927,6 +1009,7 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -940,6 +1023,7 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -953,6 +1037,7 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -966,6 +1051,7 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -1004,6 +1090,8 @@ void myKeyboard(unsigned char button, int x, int y)
 
 void mySpecialKeys(int key, int x, int y)
 {
+    if (gameFinished) return; // ignore input after finishing
+
 	float moveSpeed = 2.0f;
 	float rotSpeed = 5.0f;
 	float angle = model_bmo.rot_y * 3.14159 / 180.0;
@@ -1020,6 +1108,7 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -1033,6 +1122,7 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -1046,6 +1136,7 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -1059,6 +1150,7 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
