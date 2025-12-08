@@ -8,17 +8,38 @@
 #include <stdio.h>
 #include <string>
 
+// --- FMOD INCLUDES ---
+#include <fmod.hpp>
+
 int WIDTH = 1280;
 int HEIGHT = 720;
 
 GLuint tex;
 char title[] = "BMO's Quest";
 
+// --- FMOD GLOBAL VARIABLES ---
+FMOD::System* fmodSystem;
+FMOD::Sound* sndJump;
+FMOD::Sound* sndCollect;
+FMOD::Sound* sndBonk;
+FMOD::Sound* sndLevelWarp;
+FMOD::Sound* sndSparkle;
+FMOD::Sound* sndJellyBounce;
+FMOD::Sound* sndRescue;       // Rescue sound
+FMOD::Sound* sndCane;         // Candy cane collision sound
+FMOD::Sound* bgmCandy;
+FMOD::Sound* bgmFire;
+FMOD::Channel* channelBGM = 0;
+
+// Game state flags
+bool enchiridionFound = false;
+bool gameFinished = false;
+
 // 3D Projection Options
 GLdouble fovy = 45.0;
 GLdouble aspectRatio = (GLdouble)WIDTH / (GLdouble)HEIGHT;
 GLdouble zNear = 0.1;
-GLdouble zFar = 5000;
+GLdouble zFar = 5000; // Kept 5000 for Sky Sphere visibility
 
 class Vector
 {
@@ -55,7 +76,9 @@ float cameraHeightOffset = 0.0f;
 Model_OBJ model_candy_kingdom;
 Model_OBJ model_candy_cane;
 Model_OBJ model_bmo;
-Model_OBJ model_finn;
+Model_OBJ model_finn;         // Finn in Candy Kingdom (Portal)
+Model_OBJ model_finn_rescue;  // Finn in Fire Kingdom (Rescue target)
+bool isFinnRescued = false;   // Flag to check if rescued
 Model_OBJ model_cupcake;
 
 // --- LICH VARIABLES ---
@@ -69,7 +92,6 @@ GLTexture tex_jelly;
 // --- DONUT VARIABLES ---
 Model_OBJ model_donut;
 GLTexture tex_donut;
-// Animation for Donut
 float donutShakeAngle = 0.0f;
 
 // --- FIRE KINGDOM VARIABLES ---
@@ -180,6 +202,61 @@ GLTexture tex_coin;
 GLTexture tex_finn;
 GLTexture tex_candy_cane;
 
+// --- FMOD INITIALIZATION ---
+void InitAudio()
+{
+	FMOD_RESULT result;
+	result = FMOD::System_Create(&fmodSystem);
+	fmodSystem->init(32, FMOD_INIT_NORMAL, 0);
+
+	// Load Sound Effects
+	fmodSystem->createSound("Audio/jump.wav", FMOD_DEFAULT, 0, &sndJump);
+	fmodSystem->createSound("Audio/coin.wav", FMOD_DEFAULT, 0, &sndCollect);
+	fmodSystem->createSound("Audio/bonk.wav", FMOD_DEFAULT, 0, &sndBonk);
+	fmodSystem->createSound("Audio/warp.wav", FMOD_DEFAULT, 0, &sndLevelWarp);
+	fmodSystem->createSound("Audio/sparkle.wav", FMOD_DEFAULT, 0, &sndSparkle);
+	fmodSystem->createSound("Audio/jellybounce.wav", FMOD_DEFAULT, 0, &sndJellyBounce);
+
+	// --- LOAD RESCUE SOUND ---
+	fmodSystem->createSound("Audio/rescue.wav", FMOD_DEFAULT, 0, &sndRescue);
+
+    // --- LOAD CANDY CANE SOUND ---
+    fmodSystem->createSound("Audio/candycane.wav", FMOD_DEFAULT, 0, &sndCane);
+
+	// Load Background Music
+	fmodSystem->createSound("Audio/bgm_candy.mp3", FMOD_LOOP_NORMAL, 0, &bgmCandy);
+	fmodSystem->createSound("Audio/bgm_fire.mp3", FMOD_LOOP_NORMAL, 0, &bgmFire);
+
+	// Start Candy Kingdom Music immediately
+	fmodSystem->playSound(bgmCandy, 0, false, &channelBGM);
+	channelBGM->setVolume(0.4f);
+}
+
+// --- ENCHIRIDION COLLISION / GAME FINISH ---
+void CheckEnchiridionCollision()
+{
+    if (currentLevel != LEVEL_FIRE) return;
+    if (enchiridionFound) return;
+
+    float enchRadius = 3.0f;
+    float dx = model_bmo.pos_x - model_enchiridion.pos_x;
+    float dz = model_bmo.pos_z - model_enchiridion.pos_z;
+    float distance = sqrt(dx * dx + dz * dz);
+
+    if (distance < enchRadius)
+    {
+        enchiridionFound = true;
+        gameFinished = true;
+        printf(">>> ENCHIRIDION FOUND! FINAL SCORE: %d <<<\n", score);
+
+        // Play rescue sound and stop background music
+        FMOD::Channel* sfxChannel = 0;
+        fmodSystem->playSound(sndRescue, 0, false, &sfxChannel);
+        if (sfxChannel) sfxChannel->setVolume(1.0f);
+        if (channelBGM) channelBGM->stop();
+    }
+}
+
 // Render HUD (score)
 void RenderHUD()
 {
@@ -218,6 +295,26 @@ void RenderHUD()
 	glRasterPos2i(x + 12, y + 12);
 	for (char* c = buf; *c != '\0'; ++c)
 		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+
+	// Show Rescue Message
+	if (isFinnRescued) {
+		char rescueMsg[] = "FINN RESCUED!";
+		glColor3f(0.0f, 1.0f, 0.0f);
+		glRasterPos2i(WIDTH / 2 - 50, HEIGHT - 100);
+		for (char* c = rescueMsg; *c != '\0'; ++c)
+			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+	}
+
+    // Show Enchiridion / Final Message
+    if (enchiridionFound)
+    {
+        char finalMsg[128];
+        sprintf(finalMsg, "ENCHIRIDION FOUND! FINAL SCORE: %d", score);
+        glColor3f(1.0f, 0.8f, 0.0f);
+        glRasterPos2i(WIDTH / 2 - 120, HEIGHT - 70);
+        for (char* c = finalMsg; *c != '\0'; ++c)
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
@@ -273,10 +370,12 @@ void myInit(void)
 	glEnable(GL_NORMALIZE);
 
 	// --- SETUP SKY SPHERE GENERATOR ---
-	// This tells OpenGL to prepare a mathematical sphere
 	skyQuad = gluNewQuadric();
 	gluQuadricTexture(skyQuad, GL_TRUE); // Enable texture mapping on the sphere
 	gluQuadricOrientation(skyQuad, GLU_INSIDE); // We are inside it, so show texture on inside
+
+	// --- INITIALIZE AUDIO ---
+	InitAudio();
 }
 
 bool CheckJellyCollision(float newX, float newZ)
@@ -302,6 +401,21 @@ bool CheckDonutCollision(float newX, float newZ)
 	return (distance < donutRadius);
 }
 
+// Strict candy cane collision: very small radius representing the model itself
+bool CheckCandyCaneCollision(float newX, float newZ)
+{
+    if (currentLevel != LEVEL_CANDY) return false;
+
+    // Strict radius representing the candy cane model itself (world units)
+    float caneRadius = 1.85f;
+
+    float dx = newX - model_candy_cane.pos_x;
+    float dz = newZ - model_candy_cane.pos_z;
+    float distance = sqrt(dx * dx + dz * dz);
+
+    return (distance < caneRadius);
+}
+
 void CheckCupcakeCollisions()
 {
 	if (currentLevel != LEVEL_CANDY) return;
@@ -318,6 +432,10 @@ void CheckCupcakeCollisions()
 		{
 			cupcakeVisible[i] = false;
 			score += CUPCAKE_POINTS;
+
+			// --- PLAY SPARKLE SOUND ---
+			fmodSystem->playSound(sndSparkle, 0, false, 0);
+
 			printf("Cupcake %d collected! Score: %d\n", i + 1, score);
 		}
 	}
@@ -341,6 +459,10 @@ void CheckCoinCollision()
 		{
 			coinVisible[i] = false;
 			score += COIN_POINTS;
+
+			// --- PLAY COIN SOUND ---
+			fmodSystem->playSound(sndCollect, 0, false, 0);
+
 			printf("Coin %d Collected! +%d Points\n", i + 1, COIN_POINTS);
 		}
 	}
@@ -349,36 +471,76 @@ void CheckCoinCollision()
 // --- FINN COLLISION / LEVEL TRANSITION ---
 void CheckFinnCollision()
 {
-	if (currentLevel != LEVEL_CANDY) return;
-
-	float finnRadius = 2.0f;
-	float dx = model_bmo.pos_x - model_finn.pos_x;
-	float dz = model_bmo.pos_z - model_finn.pos_z;
-	float distance = sqrt(dx * dx + dz * dz);
-
-	if (distance < finnRadius)
+	// 1. Level Transition (Candy -> Fire)
+	if (currentLevel == LEVEL_CANDY)
 	{
-		printf(">>> TRAVELING TO FIRE KINGDOM! <<<\n");
-		currentLevel = LEVEL_FIRE;
+		float finnRadius = 2.0f;
+		float dx = model_bmo.pos_x - model_finn.pos_x;
+		float dz = model_bmo.pos_z - model_finn.pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
 
-		// Place BMO on the Fire Kingdom ground - FINAL TESTED VALUES
-		model_bmo.pos_x = -111.0f;   // Final X position from testing
-		model_bmo.pos_z = 2416.1f;   // Final Z position from testing
-		model_bmo.pos_y = 0.0f;      // Ground level
+		if (distance < finnRadius)
+		{
+			printf(">>> TRAVELING TO FIRE KINGDOM! <<<\n");
+			currentLevel = LEVEL_FIRE;
 
-		// Apply final rotation values - TESTED ORIENTATION
-		model_bmo.rot_x = -240.0f;   // X-axis rotation (pitch)
-		model_bmo.rot_y = 329.0f;    // Y-axis rotation (yaw/facing)
-		model_bmo.rot_z = 240.0f;    // Z-axis rotation (roll)
+			// --- PLAY WARP SOUND AND SWITCH MUSIC ---
+			fmodSystem->playSound(sndLevelWarp, 0, false, 0);
 
-		// Ensure physics state is stable on arrival
-		isJumping = false;
-		jumpVelocity = 0.0f;
+			// Switch BGM
+			channelBGM->stop();
+			fmodSystem->playSound(bgmFire, 0, false, &channelBGM);
+			channelBGM->setVolume(0.4f);
+
+			// Place BMO on the Fire Kingdom ground
+			model_bmo.pos_x = -111.0f;
+			model_bmo.pos_z = 2416.1f;
+			model_bmo.pos_y = 0.0f;
+
+			// Apply final rotation values
+			model_bmo.rot_x = -240.0f;
+			model_bmo.rot_y = 329.0f;
+			model_bmo.rot_z = 240.0f;
+
+			// Ensure physics state is stable on arrival
+			isJumping = false;
+			jumpVelocity = 0.0f;
+		}
+	}
+	// 2. Rescue Mission (Fire Kingdom)
+	else if (currentLevel == LEVEL_FIRE)
+	{
+		if (isFinnRescued) return; // Do nothing if already rescued
+
+		float rescueRadius = 3.0f;
+		float dx = model_bmo.pos_x - model_finn_rescue.pos_x;
+		float dz = model_bmo.pos_z - model_finn_rescue.pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
+
+		if (distance < rescueRadius)
+		{
+			isFinnRescued = true;
+			printf(">>> FINN RESCUED! <<<\n");
+
+			// --- PLAY RESCUE SOUND LOUDLY ---
+			FMOD::Channel* sfxChannel = 0;
+			fmodSystem->playSound(sndRescue, 0, false, &sfxChannel);
+			sfxChannel->setVolume(1.0f);
+		}
 	}
 }
 
 bool TryMove(float newX, float newZ)
 {
+    // Candy cane strict collision: prevent entering its exact space
+    if (CheckCandyCaneCollision(newX, newZ)) {
+        // Play cane sound and apply heavier penalty
+        fmodSystem->playSound(sndCane, 0, false, 0);
+		score -= 10; // cane penalty
+        if (score < 0) score = 0;
+        printf("Ouch! You hit the Candy Cane. -15 points. Score: %d\n", score);
+        return false;
+    }
 	// 1. Check Jelly Obstacle
 	if (CheckJellyCollision(newX, newZ))
 	{
@@ -399,6 +561,17 @@ bool TryMove(float newX, float newZ)
 		else if (jumpVelocity < 0.0f) {
 			jumpVelocity = jumpStrength * 1.8f;
 		}
+
+		// --- PLAY JELLY BOUNCE SOUND ---
+		FMOD::Channel* sfxChannel = 0;
+		fmodSystem->playSound(sndJellyBounce, 0, false, &sfxChannel);
+		if (sfxChannel) sfxChannel->setVolume(1.0f);
+
+		// small penalty for hitting jelly
+		score -= 5;
+		if (score < 0) score = 0;
+		printf("Bounced by Jelly! -5 points. Score: %d\n", score);
+
 		return false;
 	}
 
@@ -423,6 +596,15 @@ bool TryMove(float newX, float newZ)
 		else if (jumpVelocity < 0.0f) {
 			jumpVelocity = jumpStrength * 1.8f;
 		}
+
+		// --- PLAY BONK SOUND ---
+		fmodSystem->playSound(sndBonk, 0, false, 0);
+
+		// medium penalty for donut
+		score -= 8;
+		if (score < 0) score = 0;
+		printf("Bonk! You hit the Donut. -8 points. Score: %d\n", score);
+
 		printf("Bonk! You hit the Donut.\n");
 		return false;
 	}
@@ -652,11 +834,7 @@ void myDisplay(void)
 		glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
-
-		// Bind the Fire Temple Texture
 		glBindTexture(GL_TEXTURE_2D, tex_fire_temple.texture[0]);
-
-		// Apply transformations to flip it right-side up
 		glTranslatef(model_fire_temple.pos_x, model_fire_temple.pos_y, model_fire_temple.pos_z);
 
 		// Apply rotation - X-axis first (flip upside down)
@@ -674,7 +852,6 @@ void myDisplay(void)
 
 		model_fire_temple.Draw();
 
-		// Restore position
 		model_fire_temple.pos_x = temp_x;
 		model_fire_temple.pos_y = temp_y;
 		model_fire_temple.pos_z = temp_z;
@@ -826,6 +1003,33 @@ void myDisplay(void)
 		model_lava_hammer.pos_z = temp_hammer_z;
 
 		glPopMatrix();
+
+		// --- DRAW RESCUE FINN (FIRE KINGDOM) ---
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		glBindTexture(GL_TEXTURE_2D, tex_finn.texture[0]);
+
+		glTranslatef(model_finn_rescue.pos_x, model_finn_rescue.pos_y, model_finn_rescue.pos_z);
+		glRotatef(model_finn_rescue.rot_y, 0.0f, 1.0f, 0.0f);
+
+		// Reset for draw
+		float temp_finn_r_x = model_finn_rescue.pos_x;
+		float temp_finn_r_y = model_finn_rescue.pos_y;
+		float temp_finn_r_z = model_finn_rescue.pos_z;
+		model_finn_rescue.pos_x = 0.0f;
+		model_finn_rescue.pos_y = 0.0f;
+		model_finn_rescue.pos_z = 0.0f;
+
+		model_finn_rescue.Draw();
+
+		// Restore
+		model_finn_rescue.pos_x = temp_finn_r_x;
+		model_finn_rescue.pos_y = temp_finn_r_y;
+		model_finn_rescue.pos_z = temp_finn_r_z;
+
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glPopMatrix();
 	}
 
 	// ============================================
@@ -873,6 +1077,8 @@ void myDisplay(void)
 
 void myKeyboard(unsigned char button, int x, int y)
 {
+    if (gameFinished) return; // ignore input after finishing
+
 	float moveSpeed = 2.0f;
 	float rotSpeed = 5.0f;
 	float angle = model_bmo.rot_y * 3.14159 / 180.0;
@@ -898,7 +1104,8 @@ void myKeyboard(unsigned char button, int x, int y)
 		if (TryMove(newX, newZ)) {
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
-			CheckFinnCollision(); // Check for Level Transfer
+			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -912,6 +1119,7 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -925,6 +1133,7 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -938,6 +1147,7 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -945,6 +1155,9 @@ void myKeyboard(unsigned char button, int x, int y)
 		if (!isJumping) {
 			isJumping = true;
 			jumpVelocity = jumpStrength;
+
+			// --- PLAY JUMP SOUND ---
+			fmodSystem->playSound(sndJump, 0, false, 0);
 		}
 		break;
 	case 'u': case 'U':
@@ -973,6 +1186,8 @@ void myKeyboard(unsigned char button, int x, int y)
 
 void mySpecialKeys(int key, int x, int y)
 {
+    if (gameFinished) return; // ignore input after finishing
+
 	float moveSpeed = 2.0f;
 	float rotSpeed = 5.0f;
 	float angle = model_bmo.rot_y * 3.14159 / 180.0;
@@ -989,6 +1204,7 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -1002,6 +1218,7 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -1015,6 +1232,7 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -1028,6 +1246,7 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
+			CheckEnchiridionCollision();
 		}
 	}
 	break;
@@ -1076,6 +1295,10 @@ void myMouse(int button, int state, int x, int y)
 		if (!isJumping) {
 			isJumping = true;
 			jumpVelocity = jumpStrength;
+
+			// --- PLAY JUMP SOUND ---
+			fmodSystem->playSound(sndJump, 0, false, 0);
+
 			printf("Jump! (mouse)\n");
 		}
 	}
@@ -1695,8 +1918,8 @@ void LoadAssets()
 	}
 	printf("Coins Loaded.\n");
 
-	// --- FINN ---
-	printf("Loading OBJ Model: Finn...\n");
+	// --- FINN (Candy) ---
+	printf("Loading OBJ Model: Finn (Candy)...\n");
 	model_finn.Load("Models/finn/Finn.obj", "Models/finn/");
 	tex_finn.Load("Textures/finn.bmp");
 
@@ -1715,6 +1938,27 @@ void LoadAssets()
 	model_finn.rot_y = -90.0f;
 
 	model_finn.GenerateDisplayList();
+
+	// --- FINN (Fire Rescue) ---
+	printf("Loading OBJ Model: Finn (Fire Rescue)...\n");
+	model_finn_rescue.Load("Models/finn/Finn.obj", "Models/finn/"); // Reuse OBJ
+	// Reuse texture settings
+	for (auto& entry : model_finn_rescue.materials) {
+		entry.second.tex = tex_finn;
+		entry.second.hasTexture = true;
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
+	// Position him in Fire Kingdom
+	model_finn_rescue.scale_xyz = 0.1f;
+	model_finn_rescue.pos_x = -105.0f;
+	model_finn_rescue.pos_y = 0.0f;
+	model_finn_rescue.pos_z = 2430.0f;
+	model_finn_rescue.rot_y = 45.0f;
+
+	model_finn_rescue.GenerateDisplayList();
+
 	printf("Finn Ready.\n");
 
 	// --- JELLY ---
@@ -1802,6 +2046,9 @@ void myIdle(void)
 			if (score >= 5) score -= 5;
 		}
 	}
+
+	// --- UPDATE FMOD ---
+	fmodSystem->update();
 
 	glutPostRedisplay();
 }
