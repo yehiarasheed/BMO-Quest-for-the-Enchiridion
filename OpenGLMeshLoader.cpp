@@ -23,9 +23,12 @@ FMOD::Sound* sndJump;
 FMOD::Sound* sndCollect;
 FMOD::Sound* sndBonk;
 FMOD::Sound* sndLevelWarp;
+FMOD::Sound* sndSparkle;
+FMOD::Sound* sndJellyBounce;
+FMOD::Sound* sndRescue;       // <--- NEW: Rescue sound
 FMOD::Sound* bgmCandy;
 FMOD::Sound* bgmFire;
-FMOD::Channel* channelBGM = 0; // Channel to control background music
+FMOD::Channel* channelBGM = 0;
 
 // 3D Projection Options
 GLdouble fovy = 45.0;
@@ -68,7 +71,9 @@ float cameraHeightOffset = 0.0f;
 Model_OBJ model_candy_kingdom;
 Model_OBJ model_candy_cane;
 Model_OBJ model_bmo;
-Model_OBJ model_finn;
+Model_OBJ model_finn;         // Finn in Candy Kingdom (Portal)
+Model_OBJ model_finn_rescue;  // <--- NEW: Finn in Fire Kingdom (Rescue target)
+bool isFinnRescued = false;   // <--- NEW: Flag to check if rescued
 Model_OBJ model_cupcake;
 
 // --- JELLY VARIABLES ---
@@ -188,18 +193,24 @@ void InitAudio()
 	result = FMOD::System_Create(&fmodSystem);
 	fmodSystem->init(32, FMOD_INIT_NORMAL, 0);
 
-	// Load Sound Effects (Not looping)
+	// Load Sound Effects
 	fmodSystem->createSound("Audio/jump.wav", FMOD_DEFAULT, 0, &sndJump);
 	fmodSystem->createSound("Audio/coin.wav", FMOD_DEFAULT, 0, &sndCollect);
 	fmodSystem->createSound("Audio/bonk.wav", FMOD_DEFAULT, 0, &sndBonk);
 	fmodSystem->createSound("Audio/warp.wav", FMOD_DEFAULT, 0, &sndLevelWarp);
+	fmodSystem->createSound("Audio/sparkle.wav", FMOD_DEFAULT, 0, &sndSparkle);
+	fmodSystem->createSound("Audio/jellybounce.wav", FMOD_DEFAULT, 0, &sndJellyBounce);
 
-	// Load Background Music (Looping)
+	// --- LOAD RESCUE SOUND ---
+	fmodSystem->createSound("Audio/rescue.wav", FMOD_DEFAULT, 0, &sndRescue);
+
+	// Load Background Music
 	fmodSystem->createSound("Audio/bgm_candy.mp3", FMOD_LOOP_NORMAL, 0, &bgmCandy);
 	fmodSystem->createSound("Audio/bgm_fire.mp3", FMOD_LOOP_NORMAL, 0, &bgmFire);
 
 	// Start Candy Kingdom Music immediately
 	fmodSystem->playSound(bgmCandy, 0, false, &channelBGM);
+	channelBGM->setVolume(0.4f);
 }
 
 // Render HUD (score)
@@ -240,6 +251,15 @@ void RenderHUD()
 	glRasterPos2i(x + 12, y + 12);
 	for (char* c = buf; *c != '\0'; ++c)
 		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+
+	// Show Rescue Message
+	if (isFinnRescued) {
+		char rescueMsg[] = "FINN RESCUED!";
+		glColor3f(0.0f, 1.0f, 0.0f);
+		glRasterPos2i(WIDTH / 2 - 50, HEIGHT - 100);
+		for (char* c = rescueMsg; *c != '\0'; ++c)
+			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+	}
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
@@ -338,8 +358,8 @@ void CheckCupcakeCollisions()
 			cupcakeVisible[i] = false;
 			score += CUPCAKE_POINTS;
 
-			// --- PLAY COLLECT SOUND ---
-			fmodSystem->playSound(sndCollect, 0, false, 0);
+			// --- PLAY SPARKLE SOUND ---
+			fmodSystem->playSound(sndSparkle, 0, false, 0);
 
 			printf("Cupcake %d collected! Score: %d\n", i + 1, score);
 		}
@@ -365,7 +385,7 @@ void CheckCoinCollision()
 			coinVisible[i] = false;
 			score += COIN_POINTS;
 
-			// --- PLAY COLLECT SOUND ---
+			// --- PLAY COIN SOUND ---
 			fmodSystem->playSound(sndCollect, 0, false, 0);
 
 			printf("Coin %d Collected! +%d Points\n", i + 1, COIN_POINTS);
@@ -376,38 +396,62 @@ void CheckCoinCollision()
 // --- FINN COLLISION / LEVEL TRANSITION ---
 void CheckFinnCollision()
 {
-	if (currentLevel != LEVEL_CANDY) return;
-
-	float finnRadius = 2.0f;
-	float dx = model_bmo.pos_x - model_finn.pos_x;
-	float dz = model_bmo.pos_z - model_finn.pos_z;
-	float distance = sqrt(dx * dx + dz * dz);
-
-	if (distance < finnRadius)
+	// 1. Level Transition (Candy -> Fire)
+	if (currentLevel == LEVEL_CANDY)
 	{
-		printf(">>> TRAVELING TO FIRE KINGDOM! <<<\n");
-		currentLevel = LEVEL_FIRE;
+		float finnRadius = 2.0f;
+		float dx = model_bmo.pos_x - model_finn.pos_x;
+		float dz = model_bmo.pos_z - model_finn.pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
 
-		// --- PLAY WARP SOUND AND SWITCH MUSIC ---
-		fmodSystem->playSound(sndLevelWarp, 0, false, 0);
+		if (distance < finnRadius)
+		{
+			printf(">>> TRAVELING TO FIRE KINGDOM! <<<\n");
+			currentLevel = LEVEL_FIRE;
 
-		// Switch BGM
-		channelBGM->stop();
-		fmodSystem->playSound(bgmFire, 0, false, &channelBGM);
+			// --- PLAY WARP SOUND AND SWITCH MUSIC ---
+			fmodSystem->playSound(sndLevelWarp, 0, false, 0);
 
-		// Place BMO on the Fire Kingdom ground
-		model_bmo.pos_x = -111.0f;
-		model_bmo.pos_z = 2416.1f;
-		model_bmo.pos_y = 0.0f;
+			// Switch BGM
+			channelBGM->stop();
+			fmodSystem->playSound(bgmFire, 0, false, &channelBGM);
+			channelBGM->setVolume(0.4f);
 
-		// Apply final rotation values
-		model_bmo.rot_x = -240.0f;
-		model_bmo.rot_y = 329.0f;
-		model_bmo.rot_z = 240.0f;
+			// Place BMO on the Fire Kingdom ground
+			model_bmo.pos_x = -111.0f;
+			model_bmo.pos_z = 2416.1f;
+			model_bmo.pos_y = 0.0f;
 
-		// Ensure physics state is stable on arrival
-		isJumping = false;
-		jumpVelocity = 0.0f;
+			// Apply final rotation values
+			model_bmo.rot_x = -240.0f;
+			model_bmo.rot_y = 329.0f;
+			model_bmo.rot_z = 240.0f;
+
+			// Ensure physics state is stable on arrival
+			isJumping = false;
+			jumpVelocity = 0.0f;
+		}
+	}
+	// 2. Rescue Mission (Fire Kingdom)
+	else if (currentLevel == LEVEL_FIRE)
+	{
+		if (isFinnRescued) return; // Do nothing if already rescued
+
+		float rescueRadius = 3.0f;
+		float dx = model_bmo.pos_x - model_finn_rescue.pos_x;
+		float dz = model_bmo.pos_z - model_finn_rescue.pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
+
+		if (distance < rescueRadius)
+		{
+			isFinnRescued = true;
+			printf(">>> FINN RESCUED! <<<\n");
+
+			// --- PLAY RESCUE SOUND LOUDLY ---
+			FMOD::Channel* sfxChannel = 0;
+			fmodSystem->playSound(sndRescue, 0, false, &sfxChannel);
+			sfxChannel->setVolume(1.0f);
+		}
 	}
 }
 
@@ -434,8 +478,10 @@ bool TryMove(float newX, float newZ)
 			jumpVelocity = jumpStrength * 1.8f;
 		}
 
-		// --- PLAY BONK SOUND ---
-		fmodSystem->playSound(sndBonk, 0, false, 0);
+		// --- PLAY JELLY BOUNCE SOUND ---
+		FMOD::Channel* sfxChannel = 0;
+		fmodSystem->playSound(sndJellyBounce, 0, false, &sfxChannel);
+		sfxChannel->setVolume(1.0f);
 
 		return false;
 	}
@@ -783,6 +829,33 @@ void myDisplay(void)
 		model_lava_hammer.pos_x = temp_hammer_x;
 		model_lava_hammer.pos_y = temp_hammer_y;
 		model_lava_hammer.pos_z = temp_hammer_z;
+		glPopMatrix();
+
+		// --- DRAW RESCUE FINN (FIRE KINGDOM) ---
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		glBindTexture(GL_TEXTURE_2D, tex_finn.texture[0]);
+
+		glTranslatef(model_finn_rescue.pos_x, model_finn_rescue.pos_y, model_finn_rescue.pos_z);
+		glRotatef(model_finn_rescue.rot_y, 0.0f, 1.0f, 0.0f);
+
+		// Reset for draw
+		float temp_finn_r_x = model_finn_rescue.pos_x;
+		float temp_finn_r_y = model_finn_rescue.pos_y;
+		float temp_finn_r_z = model_finn_rescue.pos_z;
+		model_finn_rescue.pos_x = 0.0f;
+		model_finn_rescue.pos_y = 0.0f;
+		model_finn_rescue.pos_z = 0.0f;
+
+		model_finn_rescue.Draw();
+
+		// Restore
+		model_finn_rescue.pos_x = temp_finn_r_x;
+		model_finn_rescue.pos_y = temp_finn_r_y;
+		model_finn_rescue.pos_z = temp_finn_r_z;
+
+		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
 	}
 
@@ -1440,8 +1513,8 @@ void LoadAssets()
 	}
 	printf("Coins Loaded.\n");
 
-	// --- FINN ---
-	printf("Loading OBJ Model: Finn...\n");
+	// --- FINN (Candy) ---
+	printf("Loading OBJ Model: Finn (Candy)...\n");
 	model_finn.Load("Models/finn/Finn.obj", "Models/finn/");
 	tex_finn.Load("Textures/finn.bmp");
 
@@ -1460,6 +1533,27 @@ void LoadAssets()
 	model_finn.rot_y = -90.0f;
 
 	model_finn.GenerateDisplayList();
+
+	// --- FINN (Fire Rescue) ---
+	printf("Loading OBJ Model: Finn (Fire Rescue)...\n");
+	model_finn_rescue.Load("Models/finn/Finn.obj", "Models/finn/"); // Reuse OBJ
+	// Reuse texture settings
+	for (auto& entry : model_finn_rescue.materials) {
+		entry.second.tex = tex_finn;
+		entry.second.hasTexture = true;
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
+	// Position him in Fire Kingdom
+	model_finn_rescue.scale_xyz = 0.1f;
+	model_finn_rescue.pos_x = -105.0f;
+	model_finn_rescue.pos_y = 0.0f;
+	model_finn_rescue.pos_z = 2430.0f;
+	model_finn_rescue.rot_y = 45.0f;
+
+	model_finn_rescue.GenerateDisplayList();
+
 	printf("Finn Ready.\n");
 
 	// --- JELLY ---
