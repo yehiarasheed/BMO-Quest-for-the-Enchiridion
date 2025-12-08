@@ -86,6 +86,17 @@ GLTexture tex_golem_final;
 Model_OBJ model_flame_princess;
 GLTexture tex_flame_princess;
 
+// --- FIRE ROCK VARIABLES ---
+Model_OBJ model_fire_rock;
+GLTexture tex_fire_rock_20;
+GLTexture tex_fire_rock_0;
+
+// --- ENCHIRIDION VARIABLES ---
+Model_OBJ model_enchiridion;
+GLTexture tex_enchiridion_01;
+GLTexture tex_enchiridion_02;
+GLTexture tex_enchiridion_paper;
+
 // --- SKY VARIABLES ---
 Model_OBJ model_sky;
 GLTexture tex_sky;
@@ -668,6 +679,64 @@ void myDisplay(void)
 		model_flame_princess.pos_z = temp_fp_z;
 		
 		glPopMatrix();
+		
+		// --- DRAW FIRE ROCK ---
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		
+		// Apply Fire Rock transformations
+		glTranslatef(model_fire_rock.pos_x, model_fire_rock.pos_y, model_fire_rock.pos_z);
+		glRotatef(model_fire_rock.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
+		glRotatef(model_fire_rock.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
+		glRotatef(model_fire_rock.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
+		
+		// Temporarily reset position for proper rendering
+		float temp_rock_x = model_fire_rock.pos_x;
+		float temp_rock_y = model_fire_rock.pos_y;
+		float temp_rock_z = model_fire_rock.pos_z;
+		model_fire_rock.pos_x = 0.0f;
+		model_fire_rock.pos_y = 0.0f;
+		model_fire_rock.pos_z = 0.0f;
+		
+		// Draw Fire Rock
+		model_fire_rock.Draw();
+		
+		// Restore position
+		model_fire_rock.pos_x = temp_rock_x;
+		model_fire_rock.pos_y = temp_rock_y;
+		model_fire_rock.pos_z = temp_rock_z;
+		
+		glPopMatrix();
+		
+		// --- DRAW ENCHIRIDION ---
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		
+		// Apply Enchiridion transformations
+		glTranslatef(model_enchiridion.pos_x, model_enchiridion.pos_y, model_enchiridion.pos_z);
+		glRotatef(model_enchiridion.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
+		glRotatef(model_enchiridion.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
+		glRotatef(model_enchiridion.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
+		
+		// Temporarily reset position for proper rendering
+		float temp_ench_x = model_enchiridion.pos_x;
+		float temp_ench_y = model_enchiridion.pos_y;
+		float temp_ench_z = model_enchiridion.pos_z;
+		model_enchiridion.pos_x = 0.0f;
+		model_enchiridion.pos_y = 0.0f;
+		model_enchiridion.pos_z = 0.0f;
+		
+		// Draw Enchiridion
+		model_enchiridion.Draw();
+		
+		// Restore position
+		model_enchiridion.pos_x = temp_ench_x;
+		model_enchiridion.pos_y = temp_ench_y;
+		model_enchiridion.pos_z = temp_ench_z;
+		
+		glPopMatrix();
 	}
 
 	// ============================================
@@ -879,7 +948,7 @@ void mySpecialKeys(int key, int x, int y)
 
 void myMotion(int x, int y)
 {
-	if (!mouseLookEnabled) return;
+	if (!mouseRotationEnabled) return;
 
 	if (firstMouse) {
 		lastMouseX = x;
@@ -1079,12 +1148,12 @@ void LoadAssets()
 	printf("Golem Loaded with textures.\n");
 
 	// --- FLAME PRINCESS ---
-	printf("Loading OBJ Model: Flame Princess...\n");
-	model_flame_princess.Load("Models/flameprincess/flameprincess.obj", "Models/flameprincess/");
+	printf("Loading OBJ Model: fire Princess...\n");
+	model_flame_princess.Load("Models/firePrincess/firePrincess.obj", "Models/firePrincess/");
 	
-	// Load Flame Princess texture (assuming it exists in the textures folder)
-	printf("Loading Flame Princess texture...\n");
-	tex_flame_princess.Load("Textures/flameprincess.bmp");
+	//// Load Flame Princess texture (assuming it exists in the textures folder)
+	//printf("Loading Flame Princess texture...\n");
+	//tex_flame_princess.Load("Textures/flameprincess.bmp");
 	
 	// Apply texture to all materials
 	for (auto& entry : model_flame_princess.materials) {
@@ -1110,6 +1179,128 @@ void LoadAssets()
 	
 	model_flame_princess.GenerateDisplayList();
 	printf("Flame Princess Loaded.\n");
+
+	// --- FIRE ROCK ---
+	printf("Loading OBJ Model: Fire Rock...\n");
+	model_fire_rock.Load("Models/firerock/firerock.obj", "Models/firerock/");
+	
+	// Load Fire Rock textures
+	printf("Loading Fire Rock textures...\n");
+	tex_fire_rock_20.Load("Textures/texturesrock/rock20_tex00.bmp");
+	printf("  - Rock 20 texture loaded\n");
+	tex_fire_rock_0.Load("Textures/texturesrock/rock0_tex00.bmp");
+	printf("  - Rock 0 texture loaded\n");
+	
+	// Apply textures to Fire Rock materials based on material names
+	for (auto& entry : model_fire_rock.materials) {
+		std::string materialName = entry.first;
+		
+		// Apply appropriate texture based on material name
+		if (materialName.find("20") != std::string::npos || 
+		materialName.find("Rock20") != std::string::npos ||
+		    materialName.find("rock20") != std::string::npos) {
+			entry.second.tex = tex_fire_rock_20;
+			entry.second.hasTexture = true;
+			printf("  - Applied rock20 texture to: %s\n", materialName.c_str());
+		}
+		else if (materialName.find("0") != std::string::npos || 
+		         materialName.find("Rock0") != std::string::npos ||
+		         materialName.find("rock0") != std::string::npos) {
+			entry.second.tex = tex_fire_rock_0;
+			entry.second.hasTexture = true;
+			printf("  - Applied rock0 texture to: %s\n", materialName.c_str());
+		}
+		else {
+			// Default to rock20 texture
+			entry.second.tex = tex_fire_rock_20;
+			entry.second.hasTexture = true;
+			printf("  - Applied default rock20 texture to: %s\n", materialName.c_str());
+		}
+		
+		// Ensure proper color for texture display
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
+	
+	// Set Fire Rock size (similar to Golem)
+	model_fire_rock.scale_xyz = 1.0f;  // Increased from 0.5f to 2.0f for better visibility
+	
+	// Position Fire Rock next to Golem in Fire Kingdom
+	model_fire_rock.pos_x = -118.0f;  // Slightly left of Golem
+	model_fire_rock.pos_y = 0.0f;     // Ground level
+	model_fire_rock.pos_z = 2414.0f;  // Slightly in front of Golem
+	
+	// Rotate Fire Rock
+	model_fire_rock.rot_x = 0.0f;
+	model_fire_rock.rot_y = 45.0f;    // Angled
+	model_fire_rock.rot_z = 0.0f;
+	
+	model_fire_rock.GenerateDisplayList();
+	printf("Fire Rock Loaded.\n");
+
+	// --- ENCHIRIDION ---
+	printf("Loading OBJ Model: Enchiridion...\n");
+	model_enchiridion.Load("Models/enchiridion/enchiridion.obj", "Models/enchiridion/");
+	
+	// Load Enchiridion textures
+	printf("Loading Enchiridion textures...\n");
+	tex_enchiridion_01.Load("Textures/texturesenchiridion/enchiridion_tex_map_01.bmp");
+	printf("  - Enchiridion texture 01 loaded\n");
+	tex_enchiridion_02.Load("Textures/texturesenchiridion/enchiridion_tex_map_02.bmp");
+	printf("  - Enchiridion texture 02 loaded\n");
+	tex_enchiridion_paper.Load("Textures/texturesenchiridion/LT_AntiquePaper_03.bmp");
+	printf("  - Antique paper texture loaded\n");
+	
+	// Apply textures to Enchiridion materials based on material names
+	for (auto& entry : model_enchiridion.materials) {
+		std::string materialName = entry.first;
+		
+		// Apply appropriate texture based on material name
+		if (materialName.find("01") != std::string::npos || 
+		    materialName.find("_01") != std::string::npos ||
+		    materialName.find("Map01") != std::string::npos) {
+			entry.second.tex = tex_enchiridion_01;
+			entry.second.hasTexture = true;
+			printf("  - Applied enchiridion_01 texture to: %s\n", materialName.c_str());
+		}
+		else if (materialName.find("02") != std::string::npos || 
+		      materialName.find("_02") != std::string::npos ||
+		         materialName.find("Map02") != std::string::npos) {
+			entry.second.tex = tex_enchiridion_02;
+			entry.second.hasTexture = true;
+			printf("  - Applied enchiridion_02 texture to: %s\n", materialName.c_str());
+		}
+		else if (materialName.find("Paper") != std::string::npos || 
+		   materialName.find("paper") != std::string::npos ||
+		       materialName.find("Antique") != std::string::npos) {
+			entry.second.tex = tex_enchiridion_paper;
+			entry.second.hasTexture = true;
+			printf("  - Applied paper texture to: %s\n", materialName.c_str());
+		}
+		else {
+			// Default to texture 01
+			entry.second.tex = tex_enchiridion_01;
+			entry.second.hasTexture = true;
+			printf("  - Applied default enchiridion_01 texture to: %s\n", materialName.c_str());
+		}
+		
+		// Ensure proper color for texture display
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
+	
+	// Set Enchiridion size (smaller than Golem)
+	model_enchiridion.scale_xyz = 1.5f;  // Increased from 0.3f to 1.5f for better visibility
+	
+	// Position Enchiridion next to Golem in Fire Kingdom (on a rock or pedestal-like position)
+	model_enchiridion.pos_x = -112.0f;  // Right of Golem
+	model_enchiridion.pos_y = 1.0f;     // Slightly elevated (on a pedestal/rock)
+	model_enchiridion.pos_z = 2420.0f;  // Next to Golem
+	
+	model_enchiridion.GenerateDisplayList();
+	printf("Enchiridion Loaded.\n");
 
 	// --- SKY ---
 	printf("Loading OBJ Model: Sky...\n");
