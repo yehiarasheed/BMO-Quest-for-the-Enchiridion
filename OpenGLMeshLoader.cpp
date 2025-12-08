@@ -1076,20 +1076,20 @@ void LoadAssets()
 	printf("Loading OBJ Model: Golem...\n");
 	model_golem.Load("Models/golem/golem.obj", "Models/golem/");
 	
-	// Load all Golem textures with error checking
+	// Load all Golem textures with new BMP filenames
 	printf("Loading Golem textures...\n");
-	tex_golem_final.Load("Textures/texturesgolem/????????_????_?????.png");
-	printf("  - Main texture loaded\n");
-	tex_golem_lava_eye.Load("Textures/texturesgolem/LAva_Eye_DIFF.png");
-	printf("  - Lava eye texture loaded\n");
-	tex_golem_em_map.Load("Textures/texturesgolem/EM_MAP.png");
-	printf("  - EM map loaded\n");
-	tex_golem_norma.Load("Textures/texturesgolem/?????_????_?????.jpg");
-	printf("  - Normal map loaded\n");
-	tex_golem_ao.Load("Textures/texturesgolem/?????-????_AO.png");
-	printf("  - AO map loaded\n");
-	tex_golem_podstavka.Load("Textures/texturesgolem/?????????.png");
-	printf("  - Base texture loaded\n");
+	tex_golem_final.Load("Textures/texturesgolem/six.bmp");
+	printf("  - Main texture loaded (six.bmp)\n");
+	tex_golem_lava_eye.Load("Textures/texturesgolem/two.bmp");
+	printf("  - Lava eye texture loaded (two.bmp)\n");
+	tex_golem_em_map.Load("Textures/texturesgolem/one.bmp");
+	printf("  - EM map loaded (one.bmp)\n");
+	tex_golem_norma.Load("Textures/texturesgolem/three.bmp");
+	printf("  - Normal map loaded (three.bmp)\n");
+	tex_golem_ao.Load("Textures/texturesgolem/four.bmp");
+	printf("  - AO map loaded (four.bmp)\n");
+	tex_golem_podstavka.Load("Textures/texturesgolem/five.bmp");
+	printf("  - Base texture loaded (five.bmp)\n");
 	
 	// Debug: Print all material names
 	printf("Golem materials found:\n");
@@ -1111,7 +1111,7 @@ void LoadAssets()
 			printf("  - Applied lava eye texture to: %s\n", materialName.c_str());
 		}
 		else if (materialName.find("Podstavka") != std::string::npos || 
-		         materialName.find("podstavka") != std::string::npos ||
+		  materialName.find("podstavka") != std::string::npos ||
 		 materialName.find("Base") != std::string::npos ||
 		      materialName.find("base") != std::string::npos) {
 			entry.second.tex = tex_golem_podstavka;
