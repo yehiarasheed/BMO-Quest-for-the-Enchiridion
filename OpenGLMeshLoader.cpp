@@ -115,6 +115,7 @@ GLTexture tex_golem_norma;
 GLTexture tex_golem_ao;
 GLTexture tex_golem_podstavka;
 GLTexture tex_golem_final;
+GLTexture tex_lavarock_floor;
 // Single golem (non-array) used in some places
 Model_OBJ model_golem;
 
@@ -710,7 +711,8 @@ bool TryMove(float newX, float newZ)
 	// Candy cane strict collision: prevent entering its exact space
 	if (CheckCandyCaneCollision(newX, newZ)) {
 		// Play cane sound and apply heavier penalty
-		fmodSystem->playSound(sndCane, 0, false, 0);
+		// Use the same "bonk" sound as other obstacles
+		fmodSystem->playSound(sndBonk, 0, false, 0);
 		score -= 10; // cane penalty
 		if (score < 0) score = 0;
 		printf("Ouch! You hit the Candy Cane. -15 points. Score: %d\n", score);
@@ -1624,31 +1626,36 @@ void LoadAssets()
 	model_candy_kingdom.scale_xyz = 300.0f;
 	printf("Candy Kingdom Loaded.\n");
 
-	// --- FIRE KINGDOM ENVIRONMENT (LAVA ROCK) ---
-	printf("Loading OBJ Model: Lava Rock Environment...\n");
+	// --- FIRE KINGDOM ENVIRONMENT (LAVA ROCK FLOOR) ---
+	printf("Loading OBJ Model: Lava Rock Floor...\n");
 
-	// 1. Load the new OBJ file
+	// 1. Load the specific texture for the floor
+	tex_lavarock_floor.Load("Models/lavarock/texture_0.bmp");
+
+	// 2. Load the OBJ
 	model_fire_temple.Load("Models/lavarock/lavarock.obj", "Models/lavarock/");
 
-	//// 2. Apply a texture
-	//// Since we don't have a specific texture for this new model, 
-	//// we will reuse the 'tex_fire_rock_20' (from the small rocks) 
-	//// so it matches the theme and doesn't look white/blank.
-	//for (auto& entry : model_fire_temple.materials) {
-	//	entry.second.tex = tex_fire_rock_20; // Reusing existing rock texture
-	//	entry.second.hasTexture = true;
-	//	entry.second.diffColor[0] = 1.0f;
-	//	entry.second.diffColor[1] = 1.0f;
-	//	entry.second.diffColor[2] = 1.0f;
-	//}
+	// 3. Apply the texture manually to ensure it shows up
+	for (auto& entry : model_fire_temple.materials) {
+		entry.second.tex = tex_lavarock_floor; // <--- Use the new texture
+		entry.second.hasTexture = true;
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
 
-// --- UPDATE GROUND SIZE & POSITION ---
-	// Make it cover the whole new area (2350 to 2650)
-	model_fire_temple.scale_xyz = 250.0f; // Bigger scale
+	// 4. Set Scale and Position (Matches the 'Gauntlet' layout)
+	model_fire_temple.scale_xyz = 250.0f;
 	model_fire_temple.pos_x = -100.0f;
 	model_fire_temple.pos_y = -30.0f;
-	model_fire_temple.pos_z = 2500.0f; // Center of the map
+	model_fire_temple.pos_z = 2500.0f;
+
+	model_fire_temple.rot_x = 0.0f;
+	model_fire_temple.rot_y = 0.0f;
+	model_fire_temple.rot_z = 0.0f;
+
 	model_fire_temple.GenerateDisplayList();
+	printf("Lava Rock Floor Loaded with Texture.\n");
 
 	// --- LOAD SHARED TEXTURES FIRST ---
 	printf("Loading Shared Fire Kingdom Textures...\n");
@@ -2218,7 +2225,6 @@ void main(int argc, char** argv)
 
 	LoadAssets();
 	printf("Entering Main Loop.\n");
-
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
