@@ -1656,7 +1656,7 @@ void LoadAssets()
 	// --- THE LICH ---
 	printf("Loading OBJ Model: The Lich...\n");
 	model_lich.Load("Models/lich/Lich.obj", "Models/lich/");
-
+	tex_lich.Load("Textures/lich.bmp"); // ADDED
 	model_lich.scale_xyz = 0.5f;
 
 	// Position and Rotation
@@ -1676,58 +1676,14 @@ void LoadAssets()
 		printf("Lich Material Found: %s\n", name.c_str());
 
 		// 1. DISABLE TEXTURES (Since you don't have an image)
-		entry.second.hasTexture = false;
+		entry.second.hasTexture = true; // CHANGED
+		entry.second.tex = tex_lich; // CHANGED
 
 		// 2. ASSIGN COLORS BASED ON KEYWORDS
-
-		// CHECK FOR RED PARTS (The Sash / Cloth hanging down / Scythe Handle)
-		if (name.find("Red") != std::string::npos ||
-			name.find("Sash") != std::string::npos ||
-			name.find("Cloth") != std::string::npos ||
-			name.find("Handle") != std::string::npos)
-		{
-			// Dark Red
-			entry.second.diffColor[0] = 0.6f; // R
-			entry.second.diffColor[1] = 0.1f; // G
-			entry.second.diffColor[2] = 0.1f; // B
-		}
-		// CHECK FOR BONE PARTS (Skulls, Hands)
-		else if (name.find("Bone") != std::string::npos ||
-			name.find("Skull") != std::string::npos ||
-			name.find("Hand") != std::string::npos ||
-			name.find("White") != std::string::npos)
-		{
-			// Bone White (Light Beige)
-			entry.second.diffColor[0] = 0.9f;
-			entry.second.diffColor[1] = 0.9f;
-			entry.second.diffColor[2] = 0.8f;
-		}
-		// CHECK FOR METAL PARTS (Shoulder Armor, Chest)
-		else if (name.find("Metal") != std::string::npos ||
-			name.find("Armor") != std::string::npos ||
-			name.find("Silver") != std::string::npos ||
-			name.find("Grey") != std::string::npos)
-		{
-			// Light Grey
-			entry.second.diffColor[0] = 0.7f;
-			entry.second.diffColor[1] = 0.7f;
-			entry.second.diffColor[2] = 0.75f;
-		}
-		// CHECK FOR SCYTHE BLADE
-		else if (name.find("Blade") != std::string::npos)
-		{
-			// Dark Metal
-			entry.second.diffColor[0] = 0.3f;
-			entry.second.diffColor[1] = 0.3f;
-			entry.second.diffColor[2] = 0.35f;
-		}
-		// DEFAULT: EVERYTHING ELSE (The Robe)
-		else {
-			// Dark Grey (Not pure black, so lighting still works)
-			entry.second.diffColor[0] = 0.15f;
-			entry.second.diffColor[1] = 0.15f;
-			entry.second.diffColor[2] = 0.2f;
-		}
+		// Reset colors to white so texture shows
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
 	}
 
 	model_lich.GenerateDisplayList();
@@ -1872,6 +1828,7 @@ void LoadAssets()
 	printf("Loading OBJ Model: fire Princess...\n");
 	// FIXED: File path updated as requested
 	model_flame_princess.Load("Models/firePrincess/flameprincess.obj", "Models/firePrincess/");
+	tex_flame_princess.Load("Textures/flameprincess.bmp"); // ADDED
 	for (auto& entry : model_flame_princess.materials) {
 		entry.second.tex = tex_flame_princess;
 		entry.second.hasTexture = true;
