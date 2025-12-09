@@ -640,6 +640,68 @@ void CheckFinnCollision()
 		}
 	}
 }
+// --- GOLEM COLLISION LOGIC ---
+bool CheckGolemCollision(float newX, float newZ)
+{
+    if (currentLevel != LEVEL_FIRE) return false;
+
+    float golemRadius = 3.0f; // Adjust size if needed
+
+    for (int i = 0; i < NUM_GOLEMS; i++)
+    {
+        float dx = newX - model_golems[i].pos_x;
+        float dz = newZ - model_golems[i].pos_z;
+        float distance = sqrt(dx * dx + dz * dz);
+
+        if (distance < golemRadius)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// --- FIRE ROCK COLLISION LOGIC ---
+bool CheckFireRockCollision(float newX, float newZ)
+{
+    if (currentLevel != LEVEL_FIRE) return false;
+
+    float rockRadius = 2.5f; // Adjust size if needed
+
+    for (int i = 0; i < NUM_FIRE_ROCKS; i++)
+    {
+        float dx = newX - model_fire_rocks[i].pos_x;
+        float dz = newZ - model_fire_rocks[i].pos_z;
+        float distance = sqrt(dx * dx + dz * dz);
+
+        if (distance < rockRadius)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// --- LAVA HAMMER COLLISION LOGIC ---
+bool CheckLavaHammerCollision(float newX, float newZ)
+{
+    if (currentLevel != LEVEL_FIRE) return false;
+
+    float hammerRadius = 2.5f; // Adjust size if needed
+
+    for (int i = 0; i < NUM_LAVA_HAMMERS; i++)
+    {
+        float dx = newX - model_lava_hammers[i].pos_x;
+        float dz = newZ - model_lava_hammers[i].pos_z;
+        float distance = sqrt(dx * dx + dz * dz);
+
+        if (distance < hammerRadius)
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
 bool TryMove(float newX, float newZ)
 {
