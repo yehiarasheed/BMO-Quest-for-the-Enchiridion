@@ -97,7 +97,7 @@ Model_OBJ model_fire_temple;
 GLTexture tex_fire_temple;
 
 // --- GOLEM VARIABLES ---
-Model_OBJ model_golem;
+//Model_OBJ model_golem;
 GLTexture tex_golem_em_map;
 GLTexture tex_golem_lava_eye;
 GLTexture tex_golem_norma;
@@ -110,7 +110,7 @@ Model_OBJ model_flame_princess;
 GLTexture tex_flame_princess;
 
 // --- FIRE ROCK VARIABLES ---
-Model_OBJ model_fire_rock;
+//Model_OBJ model_fire_rock;
 GLTexture tex_fire_rock_20;
 GLTexture tex_fire_rock_0;
 
@@ -121,12 +121,20 @@ GLTexture tex_enchiridion_02;
 GLTexture tex_enchiridion_paper;
 
 // --- LAVA HAMMER VARIABLES ---
-Model_OBJ model_lava_hammer;
+//Model_OBJ model_lava_hammer;
 GLTexture tex_lava_hammer_base;
 GLTexture tex_lava_hammer_emissive;
 GLTexture tex_lava_hammer_roughness;
 GLTexture tex_lava_hammer_metallic;
 GLTexture tex_lava_hammer_normal;
+
+// --- DEMON SWORD VARIABLES ---
+//Model_OBJ model_demon_sword;
+GLTexture tex_demon_sword_albedo;
+GLTexture tex_demon_sword_ao;
+GLTexture tex_demon_sword_gloss;
+GLTexture tex_demon_sword_normal;
+GLTexture tex_demon_sword_specular;
 
 // --- SKY VARIABLES ---
 Model_OBJ model_sky;
@@ -142,6 +150,87 @@ const int NUM_COINS = 5;
 Model_OBJ model_coins[NUM_COINS];
 bool coinVisible[NUM_COINS];
 Model_OBJ model_coin;
+
+// --- DEMON SWORD COLLECTIBLE ---
+bool demonSwordVisible = true;
+float demonSwordRotation = 0.0f;
+float demonSwordBounceAngle = 0.0f;
+const int DEMON_SWORD_POINTS = 20;
+
+// --- FIRE KINGDOM OBSTACLES (Multiple) ---
+const int NUM_FIRE_ROCKS = 10;
+const int NUM_LAVA_HAMMERS = 8;
+const int NUM_GOLEMS = 12;
+const int NUM_DEMON_SWORDS = 15;
+
+Model_OBJ model_fire_rocks[NUM_FIRE_ROCKS];
+Model_OBJ model_lava_hammers[NUM_LAVA_HAMMERS];
+Model_OBJ model_golems[NUM_GOLEMS];
+Model_OBJ model_demon_swords[NUM_DEMON_SWORDS];
+
+bool demonSwordsVisible[NUM_DEMON_SWORDS];
+float demonSwordRotations[NUM_DEMON_SWORDS];
+float demonSwordBounceAngles[NUM_DEMON_SWORDS];
+
+// Random positions between BMO spawn (Z=2400) and Enchiridion (Z=2480)
+// Spread across X range: -120 to -100 (20 unit width)
+// Spread across Z range: 2405 to 2475 (70 unit length)
+float fireRockPositions[NUM_FIRE_ROCKS][3] = {
+	{ -118.0f, 0.0f, 2408.0f },
+	{ -105.0f, 0.0f, 2415.0f },
+	{ -112.0f, 0.0f, 2422.0f },
+	{ -116.0f, 0.0f, 2430.0f },
+	{ -108.0f, 0.0f, 2438.0f },
+	{ -114.0f, 0.0f, 2445.0f },
+	{ -106.0f, 0.0f, 2453.0f },
+	{ -119.0f, 0.0f, 2460.0f },
+	{ -110.0f, 0.0f, 2467.0f },
+	{ -103.0f, 0.0f, 2474.0f }
+};
+
+float lavaHammerPositions[NUM_LAVA_HAMMERS][3] = {
+	{ -115.0f, 0.0f, 2410.0f },
+	{ -107.0f, 0.0f, 2420.0f },
+	{ -113.0f, 0.0f, 2428.0f },
+	{ -109.0f, 0.0f, 2436.0f },
+	{ -117.0f, 0.0f, 2448.0f },
+	{ -105.0f, 0.0f, 2456.0f },
+	{ -111.0f, 0.0f, 2464.0f },
+	{ -104.0f, 0.0f, 2472.0f }
+};
+
+float golemPositions[NUM_GOLEMS][3] = {
+	{ -119.0f, 0.0f, 2406.0f },
+	{ -108.0f, 0.0f, 2413.0f },
+	{ -114.0f, 0.0f, 2419.0f },
+	{ -106.0f, 0.0f, 2426.0f },
+	{ -117.0f, 0.0f, 2434.0f },
+	{ -111.0f, 0.0f, 2441.0f },
+	{ -104.0f, 0.0f, 2449.0f },
+	{ -115.0f, 0.0f, 2456.0f },
+	{ -109.0f, 0.0f, 2463.0f },
+	{ -118.0f, 0.0f, 2469.0f },
+	{ -107.0f, 0.0f, 2475.0f },
+	{ -103.0f, 0.0f, 2407.0f }
+};
+
+float demonSwordPositions[NUM_DEMON_SWORDS][3] = {
+	{ -116.0f, 2.0f, 2407.0f },
+	{ -110.0f, 2.0f, 2412.0f },
+	{ -106.0f, 2.0f, 2418.0f },
+	{ -113.0f, 2.0f, 2424.0f },
+	{ -119.0f, 2.0f, 2431.0f },
+	{ -108.0f, 2.0f, 2437.0f },
+	{ -115.0f, 2.0f, 2443.0f },
+	{ -104.0f, 2.0f, 2450.0f },
+	{ -111.0f, 2.0f, 2456.0f },
+	{ -117.0f, 2.0f, 2462.0f },
+	{ -107.0f, 2.0f, 2468.0f },
+	{ -114.0f, 2.0f, 2473.0f },
+	{ -105.0f, 2.0f, 2411.0f },
+	{ -118.0f, 2.0f, 2447.0f },
+	{ -109.0f, 2.0f, 2465.0f }
+};
 
 // Coin Positions
 float coinPositions[NUM_COINS][3] = {
@@ -229,7 +318,7 @@ void CheckEnchiridionCollision()
     if (currentLevel != LEVEL_FIRE) return;
     if (enchiridionFound) return;
 
-    float enchRadius = 3.0f;
+    float enchRadius = 5.0f;
     float dx = model_bmo.pos_x - model_enchiridion.pos_x;
     float dz = model_bmo.pos_z - model_enchiridion.pos_z;
     float distance = sqrt(dx * dx + dz * dz);
@@ -387,20 +476,53 @@ bool CheckDonutCollision(float newX, float newZ)
 	return (distance < donutRadius);
 }
 
-// Strict candy cane collision: very small radius representing the model itself
-bool CheckCandyCaneCollision(float newX, float newZ)
+// --- FIRE KINGDOM OBSTACLE LOGIC ---
+bool CheckGolemCollision(float newX, float newZ)
+{
+	if (currentLevel != LEVEL_FIRE) return false;
+
+	float golemRadius = 2.5f;
+	for (int i = 0; i < NUM_GOLEMS; i++)
+	{
+		float dx = newX - model_golems[i].pos_x;
+		float dz = newZ - model_golems[i].pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
+		if (distance < golemRadius) return true;
+	}
+	return false;
+}
+
+bool CheckFireRockCollision(float newX, float newZ)
 {
     if (currentLevel != LEVEL_CANDY) return false;
 
-    // Strict radius representing the candy cane model itself (world units)
-    float caneRadius = 1.85f;
+	float rockRadius = 2.0f;
+	for (int i = 0; i < NUM_FIRE_ROCKS; i++)
+	{
+		float dx = newX - model_fire_rocks[i].pos_x;
+		float dz = newZ - model_fire_rocks[i].pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
+		if (distance < rockRadius) return true;
+	}
+	return false;
+}
 
     float dx = newX - model_candy_cane.pos_x;
     float dz = newZ - model_candy_cane.pos_z;
     float distance = sqrt(dx * dx + dz * dz);
 
-    return (distance < caneRadius);
+	float hammerRadius = 2.0f;
+	for (int i = 0; i < NUM_LAVA_HAMMERS; i++)
+	{
+		float dx = newX - model_lava_hammers[i].pos_x;
+		float dz = newZ - model_lava_hammers[i].pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
+		if (distance < hammerRadius) return true;
+	}
+	return false;
 }
+
+
 
 // Strict candy cane collision: very small radius representing the model itself
 bool CheckCandyCaneCollision(float newX, float newZ)
@@ -466,6 +588,31 @@ void CheckCoinCollision()
 			fmodSystem->playSound(sndCollect, 0, false, 0);
 
 			printf("Coin %d Collected! +%d Points\n", i + 1, COIN_POINTS);
+		}
+	}
+}
+void CheckDemonSwordCollision()
+{
+	if (currentLevel != LEVEL_FIRE) return;
+
+	float swordCollisionRadius = 3.0f;
+
+	for (int i = 0; i < NUM_DEMON_SWORDS; i++)
+	{
+		if (!demonSwordsVisible[i]) continue;
+
+		float dx = model_bmo.pos_x - model_demon_swords[i].pos_x;
+		float dz = model_bmo.pos_z - model_demon_swords[i].pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
+
+		if (distance < swordCollisionRadius)
+		{
+			demonSwordsVisible[i] = false;
+			score += DEMON_SWORD_POINTS;
+
+			fmodSystem->playSound(sndCollect, 0, false, 0);
+
+			printf("Demon Sword %d Collected! +%d Points\n", i + 1, DEMON_SWORD_POINTS);
 		}
 	}
 }
@@ -610,6 +757,113 @@ bool TryMove(float newX, float newZ)
 		printf("Bonk! You hit the Donut.\n");
 		return false;
 	}
+
+	// 3. Check Golem Obstacle (Fire Kingdom)
+	if (CheckGolemCollision(newX, newZ))
+	{
+		// Find closest golem for pushback direction
+		float minDist = 99999.0f;
+		int closestIdx = 0;
+		for (int i = 0; i < NUM_GOLEMS; i++)
+		{
+			float dx = model_bmo.pos_x - model_golems[i].pos_x;
+			float dz = model_bmo.pos_z - model_golems[i].pos_z;
+			float dist = sqrt(dx * dx + dz * dz);
+			if (dist < minDist) { minDist = dist; closestIdx = i; }
+		}
+
+		float dx = model_bmo.pos_x - model_golems[closestIdx].pos_x;
+		float dz = model_bmo.pos_z - model_golems[closestIdx].pos_z;
+		float len = sqrt(dx * dx + dz * dz);
+		float nx = 0.0f, nz = -1.0f;
+		if (len > 0.001f) { nx = dx / len; nz = dz / len; }
+
+		float pushBack = 3.0f;
+		model_bmo.pos_x = model_golems[closestIdx].pos_x + nx * (pushBack + 1.5f);
+		model_bmo.pos_z = model_golems[closestIdx].pos_z + nz * (pushBack + 1.5f);
+
+		if (!isJumping) {
+			isJumping = true;
+			jumpVelocity = jumpStrength * 0.9f;
+		}
+		else if (jumpVelocity < 0.0f) {
+			jumpVelocity = jumpStrength * 1.8f;
+		}
+
+		fmodSystem->playSound(sndBonk, 0, false, 0);
+		printf("Bonk! You hit the Golem.\n");
+		return false;
+	}
+
+	// 4. Check Fire Rock Obstacle (Fire Kingdom)
+	if (CheckFireRockCollision(newX, newZ))
+	{
+		// Find closest golem for pushback direction
+		float minDist = 99999.0f;
+		int closestIdx = 0;
+		for (int i = 0; i < NUM_GOLEMS; i++)
+		{
+			float dx = model_bmo.pos_x - model_golems[i].pos_x;
+			float dz = model_bmo.pos_z - model_golems[i].pos_z;
+			float dist = sqrt(dx * dx + dz * dz);
+			if (dist < minDist) { minDist = dist; closestIdx = i; }
+		}
+
+		float dx = model_bmo.pos_x - model_fire_rocks[closestIdx].pos_x;
+		float dz = model_bmo.pos_z - model_fire_rocks[closestIdx].pos_z;
+		float len = sqrt(dx * dx + dz * dz);
+		float nx = 0.0f, nz = -1.0f;
+		if (len > 0.001f) { nx = dx / len; nz = dz / len; }
+
+		float pushBack = 2.5f;
+		model_bmo.pos_x = model_fire_rocks[closestIdx].pos_x + nx * (pushBack + 1.5f);
+		model_bmo.pos_z = model_fire_rocks[closestIdx].pos_z + nz * (pushBack + 1.5f);
+
+		if (!isJumping) {
+			isJumping = true;
+			jumpVelocity = jumpStrength * 0.9f;
+		}
+		else if (jumpVelocity < 0.0f) {
+			jumpVelocity = jumpStrength * 1.8f;
+		}
+
+		fmodSystem->playSound(sndBonk, 0, false, 0);
+		printf("Bonk! You hit the Fire Rock.\n");
+		return false;
+	}
+
+	// 5. Check Lava Hammer Obstacle (Fire Kingdom)
+	if (CheckLavaHammerCollision(newX, newZ))
+	{
+		// Find closest golem for pushback direction
+		float minDist = 99999.0f;
+		int closestIdx = 0;
+		for (int i = 0; i < NUM_GOLEMS; i++)
+		{
+			float dx = model_bmo.pos_x - model_golems[i].pos_x;
+			float dz = model_bmo.pos_z - model_golems[i].pos_z;
+			float dist = sqrt(dx * dx + dz * dz);
+			if (dist < minDist) { minDist = dist; closestIdx = i; }
+		}
+
+		float dx = model_bmo.pos_x - model_golems[closestIdx].pos_x;
+		float dz = model_bmo.pos_z - model_golems[closestIdx].pos_z;
+		float len = sqrt(dx * dx + dz * dz);
+		float nx = 0.0f, nz = -1.0f;
+		if (len > 0.001f) { nx = dx / len; nz = dz / len; }
+		if (!isJumping) {
+			isJumping = true;
+			jumpVelocity = jumpStrength * 0.9f;
+		}
+		else if (jumpVelocity < 0.0f) {
+			jumpVelocity = jumpStrength * 1.8f;
+		}
+
+		fmodSystem->playSound(sndBonk, 0, false, 0);
+		printf("Bonk! You hit the Lava Hammer.\n");
+		return false;
+	}
+
 
 	model_bmo.pos_x = newX;
 	model_bmo.pos_z = newZ;
@@ -786,101 +1040,118 @@ void myDisplay(void)
 		glEnable(GL_LIGHTING);
 		glPopMatrix();
 
-		// --- DRAW FIRE KINGDOM TEMPLE ---
-		glPushMatrix();
-		glEnable(GL_TEXTURE_2D);
-		glColor3f(1.0f, 1.0f, 1.0f);
-		glBindTexture(GL_TEXTURE_2D, tex_fire_temple.texture[0]);
-		glTranslatef(model_fire_temple.pos_x, model_fire_temple.pos_y, model_fire_temple.pos_z);
-		glRotatef(model_fire_temple.rot_x, 1.0f, 0.0f, 0.0f);
-		glRotatef(model_fire_temple.rot_y, 0.0f, 1.0f, 0.0f);
-		glRotatef(model_fire_temple.rot_z, 0.0f, 0.0f, 1.0f);
+		// --- DRAW GOLEMS ---
+		for (int i = 0; i < NUM_GOLEMS; i++)
+		{
+			glPushMatrix();
+			glEnable(GL_TEXTURE_2D);
+			glColor3f(1.0f, 1.0f, 1.0f);
+			glTranslatef(model_golems[i].pos_x, model_golems[i].pos_y, model_golems[i].pos_z);
+			glRotatef(model_golems[i].rot_y, 0.0f, 1.0f, 0.0f);
+			glRotatef(model_golems[i].rot_x, 1.0f, 0.0f, 0.0f);
+			glRotatef(model_golems[i].rot_z, 0.0f, 0.0f, 1.0f);
 
-		float temp_x = model_fire_temple.pos_x;
-		float temp_y = model_fire_temple.pos_y;
-		float temp_z = model_fire_temple.pos_z;
-		model_fire_temple.pos_x = 0.0f;
-		model_fire_temple.pos_y = 0.0f;
-		model_fire_temple.pos_z = 0.0f;
+			float temp_x = model_golems[i].pos_x;
+			float temp_y = model_golems[i].pos_y;
+			float temp_z = model_golems[i].pos_z;
+			model_golems[i].pos_x = 0.0f;
+			model_golems[i].pos_y = 0.0f;
+			model_golems[i].pos_z = 0.0f;
 
-		model_fire_temple.Draw();
+			model_golems[i].Draw();
 
-		model_fire_temple.pos_x = temp_x;
-		model_fire_temple.pos_y = temp_y;
-		model_fire_temple.pos_z = temp_z;
+			model_golems[i].pos_x = temp_x;
+			model_golems[i].pos_y = temp_y;
+			model_golems[i].pos_z = temp_z;
+			glPopMatrix();
+		}
 
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glPopMatrix();
+		// --- DRAW FIRE ROCKS ---
+		for (int i = 0; i < NUM_FIRE_ROCKS; i++)
+		{
+			glPushMatrix();
+			glEnable(GL_TEXTURE_2D);
+			glColor3f(1.0f, 1.0f, 1.0f);
+			glTranslatef(model_fire_rocks[i].pos_x, model_fire_rocks[i].pos_y, model_fire_rocks[i].pos_z);
+			glRotatef(model_fire_rocks[i].rot_y, 0.0f, 1.0f, 0.0f);
+			glRotatef(model_fire_rocks[i].rot_x, 1.0f, 0.0f, 0.0f);
+			glRotatef(model_fire_rocks[i].rot_z, 0.0f, 0.0f, 1.0f);
 
-		// --- DRAW GOLEM ---
-		glPushMatrix();
-		glEnable(GL_TEXTURE_2D);
-		glColor3f(1.0f, 1.0f, 1.0f);
-		glTranslatef(model_golem.pos_x, model_golem.pos_y, model_golem.pos_z);
-		glRotatef(model_golem.rot_y, 0.0f, 1.0f, 0.0f);
-		glRotatef(model_golem.rot_x, 1.0f, 0.0f, 0.0f);
-		glRotatef(model_golem.rot_z, 0.0f, 0.0f, 1.0f);
+			float temp_x = model_fire_rocks[i].pos_x;
+			float temp_y = model_fire_rocks[i].pos_y;
+			float temp_z = model_fire_rocks[i].pos_z;
+			model_fire_rocks[i].pos_x = 0.0f;
+			model_fire_rocks[i].pos_y = 0.0f;
+			model_fire_rocks[i].pos_z = 0.0f;
 
-		float temp_golem_x = model_golem.pos_x;
-		float temp_golem_y = model_golem.pos_y;
-		float temp_golem_z = model_golem.pos_z;
-		model_golem.pos_x = 0.0f;
-		model_golem.pos_y = 0.0f;
-		model_golem.pos_z = 0.0f;
+			model_fire_rocks[i].Draw();
 
-		model_golem.Draw();
+			model_fire_rocks[i].pos_x = temp_x;
+			model_fire_rocks[i].pos_y = temp_y;
+			model_fire_rocks[i].pos_z = temp_z;
+			glPopMatrix();
+		}
 
-		model_golem.pos_x = temp_golem_x;
-		model_golem.pos_y = temp_golem_y;
-		model_golem.pos_z = temp_golem_z;
-		glPopMatrix();
+		// --- DRAW LAVA HAMMERS ---
+		for (int i = 0; i < NUM_LAVA_HAMMERS; i++)
+		{
+			glPushMatrix();
+			glEnable(GL_TEXTURE_2D);
+			glColor3f(1.0f, 1.0f, 1.0f);
+			glTranslatef(model_lava_hammers[i].pos_x, model_lava_hammers[i].pos_y, model_lava_hammers[i].pos_z);
+			glRotatef(model_lava_hammers[i].rot_y, 0.0f, 1.0f, 0.0f);
+			glRotatef(model_lava_hammers[i].rot_x, 1.0f, 0.0f, 0.0f);
+			glRotatef(model_lava_hammers[i].rot_z, 0.0f, 0.0f, 1.0f);
 
-		// --- DRAW FLAME PRINCESS ---
-		glPushMatrix();
-		glEnable(GL_TEXTURE_2D);
-		glColor3f(1.0f, 1.0f, 1.0f);
-		glTranslatef(model_flame_princess.pos_x, model_flame_princess.pos_y, model_flame_princess.pos_z);
-		glRotatef(model_flame_princess.rot_y, 0.0f, 1.0f, 0.0f);
-		glRotatef(model_flame_princess.rot_x, 1.0f, 0.0f, 0.0f);
-		glRotatef(model_flame_princess.rot_z, 0.0f, 0.0f, 1.0f);
+			float temp_x = model_lava_hammers[i].pos_x;
+			float temp_y = model_lava_hammers[i].pos_y;
+			float temp_z = model_lava_hammers[i].pos_z;
+			model_lava_hammers[i].pos_x = 0.0f;
+			model_lava_hammers[i].pos_y = 0.0f;
+			model_lava_hammers[i].pos_z = 0.0f;
 
-		float temp_fp_x = model_flame_princess.pos_x;
-		float temp_fp_y = model_flame_princess.pos_y;
-		float temp_fp_z = model_flame_princess.pos_z;
-		model_flame_princess.pos_x = 0.0f;
-		model_flame_princess.pos_y = 0.0f;
-		model_flame_princess.pos_z = 0.0f;
+			model_lava_hammers[i].Draw();
 
-		model_flame_princess.Draw();
+			model_lava_hammers[i].pos_x = temp_x;
+			model_lava_hammers[i].pos_y = temp_y;
+			model_lava_hammers[i].pos_z = temp_z;
+			glPopMatrix();
+		}
 
-		model_flame_princess.pos_x = temp_fp_x;
-		model_flame_princess.pos_y = temp_fp_y;
-		model_flame_princess.pos_z = temp_fp_z;
-		glPopMatrix();
+		// --- DRAW DEMON SWORDS (COLLECTIBLES) ---
+		for (int i = 0; i < NUM_DEMON_SWORDS; i++)
+		{
+			if (demonSwordsVisible[i])
+			{
+				glPushMatrix();
+				glEnable(GL_TEXTURE_2D);
+				glColor3f(1.0f, 1.0f, 1.0f);
 
-		// --- DRAW FIRE ROCK ---
-		glPushMatrix();
-		glEnable(GL_TEXTURE_2D);
-		glColor3f(1.0f, 1.0f, 1.0f);
-		glTranslatef(model_fire_rock.pos_x, model_fire_rock.pos_y, model_fire_rock.pos_z);
-		glRotatef(model_fire_rock.rot_y, 0.0f, 1.0f, 0.0f);
-		glRotatef(model_fire_rock.rot_x, 1.0f, 0.0f, 0.0f);
-		glRotatef(model_fire_rock.rot_z, 0.0f, 0.0f, 1.0f);
+				float swordBounce = 0.5f * sin(demonSwordBounceAngles[i]);
+				float sx = model_demon_swords[i].pos_x;
+				float sy = model_demon_swords[i].pos_y;
+				float sz = model_demon_swords[i].pos_z;
 
-		float temp_rock_x = model_fire_rock.pos_x;
-		float temp_rock_y = model_fire_rock.pos_y;
-		float temp_rock_z = model_fire_rock.pos_z;
-		model_fire_rock.pos_x = 0.0f;
-		model_fire_rock.pos_y = 0.0f;
-		model_fire_rock.pos_z = 0.0f;
+				glTranslatef(sx, sy + swordBounce, sz);
+				glRotatef(demonSwordRotations[i], 0.0f, 1.0f, 0.0f);
+				glRotatef(90.0f, 1.0f, 0.0f, 0.0f);  // Keep vertical
 
-		model_fire_rock.Draw();
+				float temp_x = model_demon_swords[i].pos_x;
+				float temp_y = model_demon_swords[i].pos_y;
+				float temp_z = model_demon_swords[i].pos_z;
+				model_demon_swords[i].pos_x = 0.0f;
+				model_demon_swords[i].pos_y = 0.0f;
+				model_demon_swords[i].pos_z = 0.0f;
 
-		model_fire_rock.pos_x = temp_rock_x;
-		model_fire_rock.pos_y = temp_rock_y;
-		model_fire_rock.pos_z = temp_rock_z;
-		glPopMatrix();
+				model_demon_swords[i].Draw();
 
+				model_demon_swords[i].pos_x = temp_x;
+				model_demon_swords[i].pos_y = temp_y;
+				model_demon_swords[i].pos_z = temp_z;
+
+				glPopMatrix();
+			}
+		}
 		// --- DRAW ENCHIRIDION ---
 		glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
@@ -904,27 +1175,27 @@ void myDisplay(void)
 		model_enchiridion.pos_z = temp_ench_z;
 		glPopMatrix();
 
-		// --- DRAW LAVA HAMMER ---
+		// --- DRAW FLAME PRINCESS ---
 		glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
-		glTranslatef(model_lava_hammer.pos_x, model_lava_hammer.pos_y, model_lava_hammer.pos_z);
-		glRotatef(model_lava_hammer.rot_y, 0.0f, 1.0f, 0.0f);
-		glRotatef(model_lava_hammer.rot_x, 1.0f, 0.0f, 0.0f);
-		glRotatef(model_lava_hammer.rot_z, 0.0f, 0.0f, 1.0f);
+		glTranslatef(model_flame_princess.pos_x, model_flame_princess.pos_y, model_flame_princess.pos_z);
+		glRotatef(model_flame_princess.rot_y, 0.0f, 1.0f, 0.0f);
+		glRotatef(model_flame_princess.rot_x, 1.0f, 0.0f, 0.0f);
+		glRotatef(model_flame_princess.rot_z, 0.0f, 0.0f, 1.0f);
 
-		float temp_hammer_x = model_lava_hammer.pos_x;
-		float temp_hammer_y = model_lava_hammer.pos_y;
-		float temp_hammer_z = model_lava_hammer.pos_z;
-		model_lava_hammer.pos_x = 0.0f;
-		model_lava_hammer.pos_y = 0.0f;
-		model_lava_hammer.pos_z = 0.0f;
+		float temp_fp_x = model_flame_princess.pos_x;
+		float temp_fp_y = model_flame_princess.pos_y;
+		float temp_fp_z = model_flame_princess.pos_z;
+		model_flame_princess.pos_x = 0.0f;
+		model_flame_princess.pos_y = 0.0f;
+		model_flame_princess.pos_z = 0.0f;
 
-		model_lava_hammer.Draw();
+		model_flame_princess.Draw();
 
-		model_lava_hammer.pos_x = temp_hammer_x;
-		model_lava_hammer.pos_y = temp_hammer_y;
-		model_lava_hammer.pos_z = temp_hammer_z;
+		model_flame_princess.pos_x = temp_fp_x;
+		model_flame_princess.pos_y = temp_fp_y;
+		model_flame_princess.pos_z = temp_fp_z;
 		glPopMatrix();
 
 		// --- DRAW RESCUE FINN (FIRE KINGDOM) ---
@@ -1026,6 +1297,7 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCoinCollision();
 			CheckFinnCollision();
 			CheckEnchiridionCollision();
+			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1040,6 +1312,7 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCoinCollision();
 			CheckFinnCollision();
 			CheckEnchiridionCollision();
+			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1054,6 +1327,7 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCoinCollision();
 			CheckFinnCollision();
 			CheckEnchiridionCollision();
+			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1068,6 +1342,7 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCoinCollision();
 			CheckFinnCollision();
 			CheckEnchiridionCollision();
+			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1125,6 +1400,7 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCoinCollision();
 			CheckFinnCollision();
 			CheckEnchiridionCollision();
+			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1139,6 +1415,7 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCoinCollision();
 			CheckFinnCollision();
 			CheckEnchiridionCollision();
+			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1153,6 +1430,7 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCoinCollision();
 			CheckFinnCollision();
 			CheckEnchiridionCollision();
+			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1167,6 +1445,7 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCoinCollision();
 			CheckFinnCollision();
 			CheckEnchiridionCollision();
+			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1282,51 +1561,87 @@ void LoadAssets()
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
-	model_fire_temple.scale_xyz = 200.0f;
-	model_fire_temple.pos_x = 0.0f;
-	model_fire_temple.pos_y = 595.0f;
-	model_fire_temple.pos_z = 0.0f;
-	model_fire_temple.rot_x = -290.0f;
-	model_fire_temple.rot_y = 0.0f;
-	model_fire_temple.rot_z = 0.0f;
-	model_fire_temple.GenerateDisplayList();
-	printf("Fire Temple Loaded.\n");
+	model_lava_rock_ground.scale_xyz = 600.0f;  // Larger ground to accommodate more objects
+	model_lava_rock_ground.pos_x = -111.0f;      // Center with BMO spawn
+	model_lava_rock_ground.pos_y = -50.0f;
+	model_lava_rock_ground.pos_z = 2440.0f;      // Center between spawn and enchiridion
+	model_lava_rock_ground.rot_x = 0.0f;
+	model_lava_rock_ground.rot_y = 0.0f;
+	model_lava_rock_ground.rot_z = 0.0f;
+	model_lava_rock_ground.GenerateDisplayList();
+	printf("Lava Rock Ground Loaded.\n");
 
-	// --- GOLEM ---
-	printf("Loading OBJ Model: Golem...\n");
-	model_golem.Load("Models/golem/golem.obj", "Models/golem/");
-	tex_golem_final.Load("Textures/texturesgolem/six.bmp");
-	tex_golem_lava_eye.Load("Textures/texturesgolem/two.bmp");
-	tex_golem_em_map.Load("Textures/texturesgolem/one.bmp");
-	tex_golem_norma.Load("Textures/texturesgolem/three.bmp");
-	tex_golem_ao.Load("Textures/texturesgolem/four.bmp");
-	tex_golem_podstavka.Load("Textures/texturesgolem/five.bmp");
+	// --- LOAD SHARED TEXTURES FIRST ---
+printf("Loading Shared Fire Kingdom Textures...\n");
 
-	for (auto& entry : model_golem.materials) {
-		std::string materialName = entry.first;
-		if (materialName.find("Eye") != std::string::npos ||
-			materialName.find("eye") != std::string::npos ||
-			materialName.find("Lava") != std::string::npos ||
-			materialName.find("lava") != std::string::npos) {
-			entry.second.tex = tex_golem_lava_eye;
-			entry.second.hasTexture = true;
+// Golem Textures
+tex_golem_final.Load("Textures/texturesgolem/six.bmp");
+tex_golem_lava_eye.Load("Textures/texturesgolem/two.bmp");
+tex_golem_em_map.Load("Textures/texturesgolem/one.bmp");
+tex_golem_norma.Load("Textures/texturesgolem/three.bmp");
+tex_golem_ao.Load("Textures/texturesgolem/four.bmp");
+tex_golem_podstavka.Load("Textures/texturesgolem/five.bmp");
+
+// Fire Rock Textures
+tex_fire_rock_20.Load("Textures/texturesrock/rock20_tex00.bmp");
+tex_fire_rock_0.Load("Textures/texturesrock/rock0_tex00.bmp");
+
+// Lava Hammer Textures
+tex_lava_hammer_base.Load("Textures/textureslavahammer/phong1SG_Base_color.bmp");
+tex_lava_hammer_emissive.Load("Textures/textureslavahammer/phong1SG_Emissive.bmp");
+tex_lava_hammer_roughness.Load("Textures/textureslavahammer/phong1SG_Roughness.bmp");
+tex_lava_hammer_metallic.Load("Textures/textureslavahammer/phong1SG_Metallic.bmp");
+tex_lava_hammer_normal.Load("Textures/textureslavahammer/phong1SG_Normal_OpenGL.bmp");
+
+// Demon Sword Textures
+tex_demon_sword_albedo.Load("Textures/texturesdemonsword/albedo.bmp");
+tex_demon_sword_ao.Load("Textures/texturesdemonsword/ao.bmp");
+tex_demon_sword_gloss.Load("Textures/texturesdemonsword/gloss.bmp");
+tex_demon_sword_normal.Load("Textures/texturesdemonsword/normal.bmp");
+tex_demon_sword_specular.Load("Textures/texturesdemonsword/specular.bmp");
+
+printf("Shared Textures Loaded.\n");
+	// --- GOLEMS (Multiple) ---
+	printf("Loading OBJ Model: Golems...\n");
+	for (int i = 0; i < NUM_GOLEMS; i++)
+	{
+		model_golems[i].Load("Models/golem/golem.obj", "Models/golem/");
+
+		for (auto& entry : model_golems[i].materials) {
+			std::string materialName = entry.first;
+			if (materialName.find("Eye") != std::string::npos ||
+				materialName.find("eye") != std::string::npos ||
+				materialName.find("Lava") != std::string::npos ||
+				materialName.find("lava") != std::string::npos) {
+				entry.second.tex = tex_golem_lava_eye;
+				entry.second.hasTexture = true;
+			}
+			else if (materialName.find("Podstavka") != std::string::npos ||
+				materialName.find("podstavka") != std::string::npos ||
+				materialName.find("Base") != std::string::npos ||
+				materialName.find("base") != std::string::npos) {
+				entry.second.tex = tex_golem_podstavka;
+				entry.second.hasTexture = true;
+			}
+			else {
+				entry.second.tex = tex_golem_final;
+				entry.second.hasTexture = true;
+			}
+			entry.second.diffColor[0] = 1.0f;
+			entry.second.diffColor[1] = 1.0f;
+			entry.second.diffColor[2] = 1.0f;
 		}
-		else if (materialName.find("Podstavka") != std::string::npos ||
-			materialName.find("podstavka") != std::string::npos ||
-			materialName.find("Base") != std::string::npos ||
-			materialName.find("base") != std::string::npos) {
-			entry.second.tex = tex_golem_podstavka;
-			entry.second.hasTexture = true;
-		}
-		else {
-			entry.second.tex = tex_golem_final;
-			entry.second.hasTexture = true;
-		}
-		entry.second.diffColor[0] = 1.0f;
-		entry.second.diffColor[1] = 1.0f;
-		entry.second.diffColor[2] = 1.0f;
+
+		model_golems[i].scale_xyz = 0.5f;
+		model_golems[i].pos_x = golemPositions[i][0];
+		model_golems[i].pos_y = golemPositions[i][1];
+		model_golems[i].pos_z = golemPositions[i][2];
+		model_golems[i].rot_x = 0.0f;
+		model_golems[i].rot_y = 0.0f;
+		model_golems[i].rot_z = 0.0f;
+		model_golems[i].GenerateDisplayList();
 	}
-
+	printf("Golems Loaded.\n");
 	model_golem.scale_xyz = 0.5f;
 	model_golem.pos_x = -115.0f;
 	model_golem.pos_y = 0.0f;
@@ -1357,35 +1672,45 @@ void LoadAssets()
 	model_flame_princess.GenerateDisplayList();
 	printf("Flame Princess Loaded.\n");
 
-	// --- FIRE ROCK ---
-	printf("Loading OBJ Model: Fire Rock...\n");
-	model_fire_rock.Load("Models/firerock/firerock.obj", "Models/firerock/");
-	tex_fire_rock_20.Load("Textures/texturesrock/rock20_tex00.bmp");
-	tex_fire_rock_0.Load("Textures/texturesrock/rock0_tex00.bmp");
+	// --- FIRE ROCKS (Multiple) ---
+	printf("Loading OBJ Model: Fire Rocks...\n");
+	for (int i = 0; i < NUM_FIRE_ROCKS; i++)
+	{
+		model_fire_rocks[i].Load("Models/firerock/firerock.obj", "Models/firerock/");
 
-	for (auto& entry : model_fire_rock.materials) {
-		std::string materialName = entry.first;
-		if (materialName.find("20") != std::string::npos ||
-			materialName.find("Rock20") != std::string::npos ||
-			materialName.find("rock20") != std::string::npos) {
-			entry.second.tex = tex_fire_rock_20;
-			entry.second.hasTexture = true;
+		for (auto& entry : model_fire_rocks[i].materials) {
+			std::string materialName = entry.first;
+			if (materialName.find("20") != std::string::npos ||
+				materialName.find("Rock20") != std::string::npos ||
+				materialName.find("rock20") != std::string::npos) {
+				entry.second.tex = tex_fire_rock_20;
+				entry.second.hasTexture = true;
+			}
+			else if (materialName.find("0") != std::string::npos ||
+				materialName.find("Rock0") != std::string::npos ||
+				materialName.find("rock0") != std::string::npos) {
+				entry.second.tex = tex_fire_rock_0;
+				entry.second.hasTexture = true;
+			}
+			else {
+				entry.second.tex = tex_fire_rock_20;
+				entry.second.hasTexture = true;
+			}
+			entry.second.diffColor[0] = 1.0f;
+			entry.second.diffColor[1] = 1.0f;
+			entry.second.diffColor[2] = 1.0f;
 		}
-		else if (materialName.find("0") != std::string::npos ||
-			materialName.find("Rock0") != std::string::npos ||
-			materialName.find("rock0") != std::string::npos) {
-			entry.second.tex = tex_fire_rock_0;
-			entry.second.hasTexture = true;
-		}
-		else {
-			entry.second.tex = tex_fire_rock_20;
-			entry.second.hasTexture = true;
-		}
-		entry.second.diffColor[0] = 1.0f;
-		entry.second.diffColor[1] = 1.0f;
-		entry.second.diffColor[2] = 1.0f;
+
+		model_fire_rocks[i].scale_xyz = 1.0f;
+		model_fire_rocks[i].pos_x = fireRockPositions[i][0];
+		model_fire_rocks[i].pos_y = fireRockPositions[i][1];
+		model_fire_rocks[i].pos_z = fireRockPositions[i][2];
+		model_fire_rocks[i].rot_x = 0.0f;
+		model_fire_rocks[i].rot_y = 45.0f * i;  // Different rotation for variety
+		model_fire_rocks[i].rot_z = 0.0f;
+		model_fire_rocks[i].GenerateDisplayList();
 	}
-
+	printf("Fire Rocks Loaded.\n");
 	model_fire_rock.scale_xyz = 1.0f;
 	model_fire_rock.pos_x = -118.0f;
 	model_fire_rock.pos_y = 0.0f;
@@ -1432,54 +1757,121 @@ void LoadAssets()
 		entry.second.diffColor[2] = 1.0f;
 	}
 
-	model_enchiridion.scale_xyz = 1.5f;
-	model_enchiridion.pos_x = -112.0f;
-	model_enchiridion.pos_y = 1.0f;
-	model_enchiridion.pos_z = 2420.0f;
+	model_enchiridion.scale_xyz = 4.0f;
+	model_enchiridion.pos_x = -111.0f;
+	model_enchiridion.pos_y = 3.0f;
+	model_enchiridion.pos_z = 2480.0f;  // Far end, opposite from spawn (2400)
 	model_enchiridion.GenerateDisplayList();
 	printf("Enchiridion Loaded.\n");
 
-	// --- LAVA HAMMER ---
-	printf("Loading OBJ Model: Lava Hammer...\n");
-	model_lava_hammer.Load("Models/lavahammer/lavahammer.obj", "Models/lavahammer/");
-	tex_lava_hammer_base.Load("Textures/textureslavahammer/phong1SG_Base_color.bmp");
-	tex_lava_hammer_emissive.Load("Textures/textureslavahammer/phong1SG_Emissive.bmp");
-	tex_lava_hammer_roughness.Load("Textures/textureslavahammer/phong1SG_Roughness.bmp");
-	tex_lava_hammer_metallic.Load("Textures/textureslavahammer/phong1SG_Metallic.bmp");
-	tex_lava_hammer_normal.Load("Textures/textureslavahammer/phong1SG_Normal_OpenGL.bmp");
+	// --- LAVA HAMMERS (Multiple) ---
+	printf("Loading OBJ Model: Lava Hammers...\n");
+	for (int i = 0; i < NUM_LAVA_HAMMERS; i++)
+	{
+		model_lava_hammers[i].Load("Models/lavahammer/lavahammer.obj", "Models/lavahammer/");
 
-	for (auto& entry : model_lava_hammer.materials) {
-		std::string materialName = entry.first;
-		if (materialName.find("Emissive") != std::string::npos ||
-			materialName.find("emissive") != std::string::npos ||
-			materialName.find("Glow") != std::string::npos) {
-			entry.second.tex = tex_lava_hammer_emissive;
-			entry.second.hasTexture = true;
+		for (auto& entry : model_lava_hammers[i].materials) {
+			std::string materialName = entry.first;
+			if (materialName.find("Emissive") != std::string::npos ||
+				materialName.find("emissive") != std::string::npos ||
+				materialName.find("Glow") != std::string::npos) {
+				entry.second.tex = tex_lava_hammer_emissive;
+				entry.second.hasTexture = true;
+			}
+			else if (materialName.find("Metal") != std::string::npos ||
+				materialName.find("metal") != std::string::npos) {
+				entry.second.tex = tex_lava_hammer_metallic;
+				entry.second.hasTexture = true;
+			}
+			else if (materialName.find("Rough") != std::string::npos ||
+				materialName.find("rough") != std::string::npos) {
+				entry.second.tex = tex_lava_hammer_roughness;
+				entry.second.hasTexture = true;
+			}
+			else if (materialName.find("Normal") != std::string::npos ||
+				materialName.find("normal") != std::string::npos) {
+				entry.second.tex = tex_lava_hammer_normal;
+				entry.second.hasTexture = true;
+			}
+			else {
+				entry.second.tex = tex_lava_hammer_base;
+				entry.second.hasTexture = true;
+			}
+			entry.second.diffColor[0] = 1.0f;
+			entry.second.diffColor[1] = 1.0f;
+			entry.second.diffColor[2] = 1.0f;
 		}
-		else if (materialName.find("Metal") != std::string::npos ||
-			materialName.find("metal") != std::string::npos) {
-			entry.second.tex = tex_lava_hammer_metallic;
-			entry.second.hasTexture = true;
-		}
-		else if (materialName.find("Rough") != std::string::npos ||
-			materialName.find("rough") != std::string::npos) {
-			entry.second.tex = tex_lava_hammer_roughness;
-			entry.second.hasTexture = true;
-		}
-		else if (materialName.find("Normal") != std::string::npos ||
-			materialName.find("normal") != std::string::npos) {
-			entry.second.tex = tex_lava_hammer_normal;
-			entry.second.hasTexture = true;
-		}
-		else {
-			entry.second.tex = tex_lava_hammer_base;
-			entry.second.hasTexture = true;
-		}
-		entry.second.diffColor[0] = 1.0f;
-		entry.second.diffColor[1] = 1.0f;
-		entry.second.diffColor[2] = 1.0f;
+
+		model_lava_hammers[i].scale_xyz = 1.0f;
+		model_lava_hammers[i].pos_x = lavaHammerPositions[i][0];
+		model_lava_hammers[i].pos_y = lavaHammerPositions[i][1];
+		model_lava_hammers[i].pos_z = lavaHammerPositions[i][2];
+		model_lava_hammers[i].rot_x = 0.0f;
+		model_lava_hammers[i].rot_y = -30.0f + (i * 60.0f);  // Different rotations
+		model_lava_hammers[i].rot_z = 0.0f;
+		model_lava_hammers[i].GenerateDisplayList();
 	}
+	printf("Lava Hammers Loaded.\n");
 
+	// --- DEMON SWORDS (Multiple Collectibles) ---
+	printf("Loading OBJ Model: Demon Swords...\n");
+	for (int i = 0; i < NUM_DEMON_SWORDS; i++)
+	{
+		model_demon_swords[i].Load("Models/demonsword/demonsword.obj", "Models/demonsword/");
+
+		for (auto& entry : model_demon_swords[i].materials) {
+			std::string materialName = entry.first;
+			if (materialName.find("Albedo") != std::string::npos ||
+				materialName.find("albedo") != std::string::npos ||
+				materialName.find("Base") != std::string::npos ||
+				materialName.find("base") != std::string::npos) {
+				entry.second.tex = tex_demon_sword_albedo;
+				entry.second.hasTexture = true;
+			}
+			else if (materialName.find("AO") != std::string::npos ||
+				materialName.find("ao") != std::string::npos ||
+				materialName.find("Occlusion") != std::string::npos) {
+				entry.second.tex = tex_demon_sword_ao;
+				entry.second.hasTexture = true;
+			}
+			else if (materialName.find("Gloss") != std::string::npos ||
+				materialName.find("gloss") != std::string::npos) {
+				entry.second.tex = tex_demon_sword_gloss;
+				entry.second.hasTexture = true;
+			}
+			else if (materialName.find("Normal") != std::string::npos ||
+				materialName.find("normal") != std::string::npos) {
+				entry.second.tex = tex_demon_sword_normal;
+				entry.second.hasTexture = true;
+			}
+			else if (materialName.find("Specular") != std::string::npos ||
+				materialName.find("specular") != std::string::npos) {
+				entry.second.tex = tex_demon_sword_specular;
+				entry.second.hasTexture = true;
+			}
+			else {
+				entry.second.tex = tex_demon_sword_albedo;
+				entry.second.hasTexture = true;
+			}
+			entry.second.diffColor[0] = 1.0f;
+			entry.second.diffColor[1] = 1.0f;
+			entry.second.diffColor[2] = 1.0f;
+		}
+
+		model_demon_swords[i].scale_xyz = 0.05f;
+		model_demon_swords[i].pos_x = demonSwordPositions[i][0];
+		model_demon_swords[i].pos_y = demonSwordPositions[i][1];
+		model_demon_swords[i].pos_z = demonSwordPositions[i][2];
+		model_demon_swords[i].rot_x = 90.0f;  // Vertical
+		model_demon_swords[i].rot_y = 0.0f;
+		model_demon_swords[i].rot_z = 0.0f;
+		model_demon_swords[i].GenerateDisplayList();
+
+		demonSwordsVisible[i] = true;
+		demonSwordRotations[i] = 0.0f;
+		demonSwordBounceAngles[i] = i * 1.0f;  // Stagger animations
+	}
+	printf("Demon Swords Loaded.\n");
 	model_lava_hammer.scale_xyz = 1.0f;
 	model_lava_hammer.pos_x = -108.0f;
 	model_lava_hammer.pos_y = 0.0f;
@@ -1542,15 +1934,15 @@ void LoadAssets()
 
 	for (int i = 0; i < NUM_CUPCAKES; i++)
 	{
-		model_cupcakes[i].Load("Models/cupcake/cupcake.obj", "Models/cupcake/");
-		for (auto& entry : model_cupcakes[i].materials) {
-			entry.second.tex = tex_cupcake;
-			entry.second.hasTexture = true;
-			entry.second.diffColor[0] = 1.0f;
-			entry.second.diffColor[1] = 1.0f;
-			entry.second.diffColor[2] = 1.0f;
-		}
-		model_cupcakes[i].GenerateDisplayList();
+	model_cupcakes[i].Load("Models/cupcake/cupcake.obj", "Models/cupcake/");
+	for (auto& entry : model_cupcakes[i].materials) {
+		entry.second.tex = tex_cupcake;
+		entry.second.hasTexture = true;
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
+	model_cupcakes[i].GenerateDisplayList();
 		model_cupcakes[i].scale_xyz = 50.0f;
 		model_cupcakes[i].pos_x = 65.0f;
 		model_cupcakes[i].pos_y = 0.5f;
@@ -1655,9 +2047,9 @@ void LoadAssets()
 	}
 	// Position him in Fire Kingdom
 	model_finn_rescue.scale_xyz = 0.1f;
-	model_finn_rescue.pos_x = -105.0f;
+	model_finn_rescue.pos_x = -111.0f;
 	model_finn_rescue.pos_y = 0.0f;
-	model_finn_rescue.pos_z = 2430.0f;
+	model_finn_rescue.pos_z = 2440.0f;  // Middle between 2400 (BMO) and 2480 (Enchiridion)
 	model_finn_rescue.rot_y = 45.0f;
 
 	model_finn_rescue.GenerateDisplayList();
@@ -1683,7 +2075,6 @@ void LoadAssets()
 	model_jelly.pos_z = 50.0f;
 	printf("Jelly Loaded.\n");
 }
-
 void myIdle(void)
 {
 	if (isJumping) {
@@ -1711,6 +2102,19 @@ void myIdle(void)
 
 	// Animate Donut (Shake/Bounce)
 	donutShakeAngle += 0.1f;
+
+	// Animate finn
+	finnBounceAngle += 0.05f;
+
+	// Animate Demon Swords
+	for (int i = 0; i < NUM_DEMON_SWORDS; i++)
+	{
+		demonSwordRotations[i] += 2.0f;
+		if (demonSwordRotations[i] >= 360.0f)
+			demonSwordRotations[i] = 0.0f;
+
+		demonSwordBounceAngles[i] += 0.1f;
+	}
 
 	// --- UPDATE FMOD ---
 	fmodSystem->update();
