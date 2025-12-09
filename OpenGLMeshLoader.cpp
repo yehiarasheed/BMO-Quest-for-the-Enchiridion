@@ -25,8 +25,8 @@ FMOD::Sound* sndBonk;
 FMOD::Sound* sndLevelWarp;
 FMOD::Sound* sndSparkle;
 FMOD::Sound* sndJellyBounce;
-FMOD::Sound* sndRescue;       // <--- NEW: Rescue sound
-FMOD::Sound* sndCane;         // <--- NEW: Candy cane collision sound
+FMOD::Sound* sndRescue;       // Rescue sound
+FMOD::Sound* sndCane;         // Candy cane collision sound
 FMOD::Sound* bgmCandy;
 FMOD::Sound* bgmFire;
 FMOD::Channel* channelBGM = 0;
@@ -39,7 +39,7 @@ bool gameFinished = false;
 GLdouble fovy = 45.0;
 GLdouble aspectRatio = (GLdouble)WIDTH / (GLdouble)HEIGHT;
 GLdouble zNear = 0.1;
-GLdouble zFar = 3000;
+GLdouble zFar = 5000; // Increased to see sky sphere
 
 class Vector
 {
@@ -53,9 +53,7 @@ public:
 		y += value;
 		z += value;
 	}
-	
 };
-	
 
 Vector Eye(20, 5, 20);
 Vector At(0, 0, 0);
@@ -79,9 +77,13 @@ Model_OBJ model_candy_kingdom;
 Model_OBJ model_candy_cane;
 Model_OBJ model_bmo;
 Model_OBJ model_finn;         // Finn in Candy Kingdom (Portal)
-Model_OBJ model_finn_rescue;  // <--- NEW: Finn in Fire Kingdom (Rescue target)
-bool isFinnRescued = false;   // <--- NEW: Flag to check if rescued
+Model_OBJ model_finn_rescue;  // Finn in Fire Kingdom (Rescue target)
+bool isFinnRescued = false;   // Flag to check if rescued
 Model_OBJ model_cupcake;
+
+// --- LICH VARIABLES (NEW) ---
+Model_OBJ model_lich;
+GLTexture tex_lich;
 
 // --- JELLY VARIABLES ---
 Model_OBJ model_jelly;
@@ -90,6 +92,7 @@ GLTexture tex_jelly;
 // --- DONUT VARIABLES ---
 Model_OBJ model_donut;
 GLTexture tex_donut;
+// Animation for Donut
 float donutShakeAngle = 0.0f;
 
 // --- FIRE KINGDOM VARIABLES ---
@@ -99,9 +102,7 @@ GLTexture tex_fire_temple;
 // Additional single-instance models used by the Fire Kingdom
 Model_OBJ model_lava_rock_ground; // ground patch for fire kingdom
 
-
 // --- GOLEM VARIABLES ---
-//Model_OBJ model_golem;
 GLTexture tex_golem_em_map;
 GLTexture tex_golem_lava_eye;
 GLTexture tex_golem_norma;
@@ -116,7 +117,6 @@ Model_OBJ model_flame_princess;
 GLTexture tex_flame_princess;
 
 // --- FIRE ROCK VARIABLES ---
-//Model_OBJ model_fire_rock;
 GLTexture tex_fire_rock_20;
 GLTexture tex_fire_rock_0;
 // Single fire rock reference
@@ -129,7 +129,6 @@ GLTexture tex_enchiridion_02;
 GLTexture tex_enchiridion_paper;
 
 // --- LAVA HAMMER VARIABLES ---
-//Model_OBJ model_lava_hammer;
 GLTexture tex_lava_hammer_base;
 GLTexture tex_lava_hammer_emissive;
 GLTexture tex_lava_hammer_roughness;
@@ -139,16 +138,17 @@ GLTexture tex_lava_hammer_normal;
 Model_OBJ model_lava_hammer;
 
 // --- DEMON SWORD VARIABLES ---
-//Model_OBJ model_demon_sword;
 GLTexture tex_demon_sword_albedo;
 GLTexture tex_demon_sword_ao;
 GLTexture tex_demon_sword_gloss;
 GLTexture tex_demon_sword_normal;
 GLTexture tex_demon_sword_specular;
 
-// --- SKY VARIABLES ---
+// --- SKY VARIABLES (UPDATED) ---
 Model_OBJ model_sky;
-GLTexture tex_sky;
+GLTexture tex_sky;       // Candy Kingdom Sky
+GLTexture tex_sky_fire;  // Fire Kingdom Sky (NEW)
+GLUquadricObj* skyQuad;  // For drawing the sphere
 
 // Cupcake array for collectibles
 const int NUM_CUPCAKES = 5;
@@ -182,64 +182,35 @@ bool demonSwordsVisible[NUM_DEMON_SWORDS];
 float demonSwordRotations[NUM_DEMON_SWORDS];
 float demonSwordBounceAngles[NUM_DEMON_SWORDS];
 
+// --- LICH MOVEMENT VARIABLES (NEW) ---
+float lichStartX = 0.0f;    // Set in LoadAssets
+float lichRange = 40.0f;    // How far he walks from the center
+float lichSpeed = 0.25f;    // How fast he moves
+int lichDirection = 1;      // 1 = Right, -1 = Left
+
 // Random positions between BMO spawn (Z=2400) and Enchiridion (Z=2480)
-// Spread across X range: -120 to -100 (20 unit width)
-// Spread across Z range: 2405 to 2475 (70 unit length)
 float fireRockPositions[NUM_FIRE_ROCKS][3] = {
-	{ -118.0f, 0.0f, 2408.0f },
-	{ -105.0f, 0.0f, 2415.0f },
-	{ -112.0f, 0.0f, 2422.0f },
-	{ -116.0f, 0.0f, 2430.0f },
-	{ -108.0f, 0.0f, 2438.0f },
-	{ -114.0f, 0.0f, 2445.0f },
-	{ -106.0f, 0.0f, 2453.0f },
-	{ -119.0f, 0.0f, 2460.0f },
-	{ -110.0f, 0.0f, 2467.0f },
-	{ -103.0f, 0.0f, 2474.0f }
+	{ -118.0f, 0.0f, 2408.0f }, { -105.0f, 0.0f, 2415.0f }, { -112.0f, 0.0f, 2422.0f }, { -116.0f, 0.0f, 2430.0f },
+	{ -108.0f, 0.0f, 2438.0f }, { -114.0f, 0.0f, 2445.0f }, { -106.0f, 0.0f, 2453.0f }, { -119.0f, 0.0f, 2460.0f },
+	{ -110.0f, 0.0f, 2467.0f }, { -103.0f, 0.0f, 2474.0f }
 };
 
 float lavaHammerPositions[NUM_LAVA_HAMMERS][3] = {
-	{ -115.0f, 0.0f, 2410.0f },
-	{ -107.0f, 0.0f, 2420.0f },
-	{ -113.0f, 0.0f, 2428.0f },
-	{ -109.0f, 0.0f, 2436.0f },
-	{ -117.0f, 0.0f, 2448.0f },
-	{ -105.0f, 0.0f, 2456.0f },
-	{ -111.0f, 0.0f, 2464.0f },
-	{ -104.0f, 0.0f, 2472.0f }
+	{ -115.0f, 0.0f, 2410.0f }, { -107.0f, 0.0f, 2420.0f }, { -113.0f, 0.0f, 2428.0f }, { -109.0f, 0.0f, 2436.0f },
+	{ -117.0f, 0.0f, 2448.0f }, { -105.0f, 0.0f, 2456.0f }, { -111.0f, 0.0f, 2464.0f }, { -104.0f, 0.0f, 2472.0f }
 };
 
 float golemPositions[NUM_GOLEMS][3] = {
-	{ -119.0f, 0.0f, 2406.0f },
-	{ -108.0f, 0.0f, 2413.0f },
-	{ -114.0f, 0.0f, 2419.0f },
-	{ -106.0f, 0.0f, 2426.0f },
-	{ -117.0f, 0.0f, 2434.0f },
-	{ -111.0f, 0.0f, 2441.0f },
-	{ -104.0f, 0.0f, 2449.0f },
-	{ -115.0f, 0.0f, 2456.0f },
-	{ -109.0f, 0.0f, 2463.0f },
-	{ -118.0f, 0.0f, 2469.0f },
-	{ -107.0f, 0.0f, 2475.0f },
-	{ -103.0f, 0.0f, 2407.0f }
+	{ -119.0f, 0.0f, 2406.0f }, { -108.0f, 0.0f, 2413.0f }, { -114.0f, 0.0f, 2419.0f }, { -106.0f, 0.0f, 2426.0f },
+	{ -117.0f, 0.0f, 2434.0f }, { -111.0f, 0.0f, 2441.0f }, { -104.0f, 0.0f, 2449.0f }, { -115.0f, 0.0f, 2456.0f },
+	{ -109.0f, 0.0f, 2463.0f }, { -118.0f, 0.0f, 2469.0f }, { -107.0f, 0.0f, 2475.0f }, { -103.0f, 0.0f, 2407.0f }
 };
 
 float demonSwordPositions[NUM_DEMON_SWORDS][3] = {
-	{ -116.0f, 2.0f, 2407.0f },
-	{ -110.0f, 2.0f, 2412.0f },
-	{ -106.0f, 2.0f, 2418.0f },
-	{ -113.0f, 2.0f, 2424.0f },
-	{ -119.0f, 2.0f, 2431.0f },
-	{ -108.0f, 2.0f, 2437.0f },
-	{ -115.0f, 2.0f, 2443.0f },
-	{ -104.0f, 2.0f, 2450.0f },
-	{ -111.0f, 2.0f, 2456.0f },
-	{ -117.0f, 2.0f, 2462.0f },
-	{ -107.0f, 2.0f, 2468.0f },
-	{ -114.0f, 2.0f, 2473.0f },
-	{ -105.0f, 2.0f, 2411.0f },
-	{ -118.0f, 2.0f, 2447.0f },
-	{ -109.0f, 2.0f, 2465.0f }
+	{ -116.0f, 2.0f, 2407.0f }, { -110.0f, 2.0f, 2412.0f }, { -106.0f, 2.0f, 2418.0f }, { -113.0f, 2.0f, 2424.0f },
+	{ -119.0f, 2.0f, 2431.0f }, { -108.0f, 2.0f, 2437.0f }, { -115.0f, 2.0f, 2443.0f }, { -104.0f, 2.0f, 2450.0f },
+	{ -111.0f, 2.0f, 2456.0f }, { -117.0f, 2.0f, 2462.0f }, { -107.0f, 2.0f, 2468.0f }, { -114.0f, 2.0f, 2473.0f },
+	{ -105.0f, 2.0f, 2411.0f }, { -118.0f, 2.0f, 2447.0f }, { -109.0f, 2.0f, 2465.0f }
 };
 
 // Coin Positions
@@ -310,8 +281,8 @@ void InitAudio()
 	// --- LOAD RESCUE SOUND ---
 	fmodSystem->createSound("Audio/rescue.wav", FMOD_DEFAULT, 0, &sndRescue);
 
-    // --- LOAD CANDY CANE SOUND ---
-    fmodSystem->createSound("Audio/candycane.wav", FMOD_DEFAULT, 0, &sndCane);
+	// --- LOAD CANDY CANE SOUND ---
+	fmodSystem->createSound("Audio/candycane.wav", FMOD_DEFAULT, 0, &sndCane);
 
 	// Load Background Music
 	fmodSystem->createSound("Audio/bgm_candy.mp3", FMOD_LOOP_NORMAL, 0, &bgmCandy);
@@ -325,26 +296,26 @@ void InitAudio()
 // --- ENCHIRIDION COLLISION / GAME FINISH ---
 void CheckEnchiridionCollision()
 {
-    if (currentLevel != LEVEL_FIRE) return;
-    if (enchiridionFound) return;
+	if (currentLevel != LEVEL_FIRE) return;
+	if (enchiridionFound) return;
 
-    float enchRadius = 5.0f;
-    float dx = model_bmo.pos_x - model_enchiridion.pos_x;
-    float dz = model_bmo.pos_z - model_enchiridion.pos_z;
-    float distance = sqrt(dx * dx + dz * dz);
+	float enchRadius = 5.0f;
+	float dx = model_bmo.pos_x - model_enchiridion.pos_x;
+	float dz = model_bmo.pos_z - model_enchiridion.pos_z;
+	float distance = sqrt(dx * dx + dz * dz);
 
-    if (distance < enchRadius)
-    {
-        enchiridionFound = true;
-        gameFinished = true;
-        printf(">>> ENCHIRIDION FOUND! FINAL SCORE: %d <<<\n", score);
+	if (distance < enchRadius)
+	{
+		enchiridionFound = true;
+		gameFinished = true;
+		printf(">>> ENCHIRIDION FOUND! FINAL SCORE: %d <<<\n", score);
 
-        // Play rescue sound and stop background music
-        FMOD::Channel* sfxChannel = 0;
-        fmodSystem->playSound(sndRescue, 0, false, &sfxChannel);
-        if (sfxChannel) sfxChannel->setVolume(1.0f);
-        if (channelBGM) channelBGM->stop();
-    }
+		// Play rescue sound and stop background music
+		FMOD::Channel* sfxChannel = 0;
+		fmodSystem->playSound(sndRescue, 0, false, &sfxChannel);
+		if (sfxChannel) sfxChannel->setVolume(1.0f);
+		if (channelBGM) channelBGM->stop();
+	}
 }
 
 // Render HUD (score)
@@ -395,16 +366,16 @@ void RenderHUD()
 			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
 	}
 
-    // Show Enchiridion / Final Message
-    if (enchiridionFound)
-    {
-        char finalMsg[128];
-        sprintf(finalMsg, "ENCHIRIDION FOUND! FINAL SCORE: %d", score);
-        glColor3f(1.0f, 0.8f, 0.0f);
-        glRasterPos2i(WIDTH / 2 - 120, HEIGHT - 70);
-        for (char* c = finalMsg; *c != '\0'; ++c)
-            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
-    }
+	// Show Enchiridion / Final Message
+	if (enchiridionFound)
+	{
+		char finalMsg[128];
+		sprintf(finalMsg, "ENCHIRIDION FOUND! FINAL SCORE: %d", score);
+		glColor3f(1.0f, 0.8f, 0.0f);
+		glRasterPos2i(WIDTH / 2 - 120, HEIGHT - 70);
+		for (char* c = finalMsg; *c != '\0'; ++c)
+			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+	}
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
@@ -461,6 +432,12 @@ void myInit(void)
 
 	// --- INITIALIZE AUDIO ---
 	InitAudio();
+
+	// --- SETUP SKY SPHERE GENERATOR (NEW) ---
+	// This tells OpenGL to prepare a mathematical sphere
+	skyQuad = gluNewQuadric();
+	gluQuadricTexture(skyQuad, GL_TRUE); // Enable texture mapping on the sphere
+	gluQuadricOrientation(skyQuad, GLU_INSIDE); // We are inside it, so show texture on inside
 }
 
 bool CheckJellyCollision(float newX, float newZ)
@@ -640,80 +617,81 @@ void CheckFinnCollision()
 		}
 	}
 }
+
 // --- GOLEM COLLISION LOGIC ---
 bool CheckGolemCollision(float newX, float newZ)
 {
-    if (currentLevel != LEVEL_FIRE) return false;
+	if (currentLevel != LEVEL_FIRE) return false;
 
-    float golemRadius = 3.0f; // Adjust size if needed
+	float golemRadius = 3.0f; // Adjust size if needed
 
-    for (int i = 0; i < NUM_GOLEMS; i++)
-    {
-        float dx = newX - model_golems[i].pos_x;
-        float dz = newZ - model_golems[i].pos_z;
-        float distance = sqrt(dx * dx + dz * dz);
+	for (int i = 0; i < NUM_GOLEMS; i++)
+	{
+		float dx = newX - model_golems[i].pos_x;
+		float dz = newZ - model_golems[i].pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
 
-        if (distance < golemRadius)
-        {
-            return true;
-        }
-    }
-    return false;
+		if (distance < golemRadius)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 // --- FIRE ROCK COLLISION LOGIC ---
 bool CheckFireRockCollision(float newX, float newZ)
 {
-    if (currentLevel != LEVEL_FIRE) return false;
+	if (currentLevel != LEVEL_FIRE) return false;
 
-    float rockRadius = 2.5f; // Adjust size if needed
+	float rockRadius = 2.5f; // Adjust size if needed
 
-    for (int i = 0; i < NUM_FIRE_ROCKS; i++)
-    {
-        float dx = newX - model_fire_rocks[i].pos_x;
-        float dz = newZ - model_fire_rocks[i].pos_z;
-        float distance = sqrt(dx * dx + dz * dz);
+	for (int i = 0; i < NUM_FIRE_ROCKS; i++)
+	{
+		float dx = newX - model_fire_rocks[i].pos_x;
+		float dz = newZ - model_fire_rocks[i].pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
 
-        if (distance < rockRadius)
-        {
-            return true;
-        }
-    }
-    return false;
+		if (distance < rockRadius)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 // --- LAVA HAMMER COLLISION LOGIC ---
 bool CheckLavaHammerCollision(float newX, float newZ)
 {
-    if (currentLevel != LEVEL_FIRE) return false;
+	if (currentLevel != LEVEL_FIRE) return false;
 
-    float hammerRadius = 2.5f; // Adjust size if needed
+	float hammerRadius = 2.5f; // Adjust size if needed
 
-    for (int i = 0; i < NUM_LAVA_HAMMERS; i++)
-    {
-        float dx = newX - model_lava_hammers[i].pos_x;
-        float dz = newZ - model_lava_hammers[i].pos_z;
-        float distance = sqrt(dx * dx + dz * dz);
+	for (int i = 0; i < NUM_LAVA_HAMMERS; i++)
+	{
+		float dx = newX - model_lava_hammers[i].pos_x;
+		float dz = newZ - model_lava_hammers[i].pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
 
-        if (distance < hammerRadius)
-        {
-            return true;
-        }
-    }
-    return false;
+		if (distance < hammerRadius)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 bool TryMove(float newX, float newZ)
 {
-    // Candy cane strict collision: prevent entering its exact space
-    if (CheckCandyCaneCollision(newX, newZ)) {
-        // Play cane sound and apply heavier penalty
-        fmodSystem->playSound(sndCane, 0, false, 0);
+	// Candy cane strict collision: prevent entering its exact space
+	if (CheckCandyCaneCollision(newX, newZ)) {
+		// Play cane sound and apply heavier penalty
+		fmodSystem->playSound(sndCane, 0, false, 0);
 		score -= 10; // cane penalty
-        if (score < 0) score = 0;
-        printf("Ouch! You hit the Candy Cane. -15 points. Score: %d\n", score);
-        return false;
-    }
+		if (score < 0) score = 0;
+		printf("Ouch! You hit the Candy Cane. -15 points. Score: %d\n", score);
+		return false;
+	}
 	// 1. Check Jelly Obstacle
 	if (CheckJellyCollision(newX, newZ))
 	{
@@ -894,6 +872,50 @@ bool TryMove(float newX, float newZ)
 	return true;
 }
 
+// --- FUNCTION TO DRAW THE SKY SPHERE (NEW) ---
+void DrawSkySphere()
+{
+	glPushMatrix();
+
+	// 1. Disable lighting so the sky is always bright (it's a picture)
+	glDisable(GL_LIGHTING);
+	// 2. Don't write to depth buffer so it appears "behind" everything
+	glDepthMask(GL_FALSE);
+
+	glEnable(GL_TEXTURE_2D);
+	glColor3f(1.0f, 1.0f, 1.0f); // Pure white so texture colors show correctly
+
+	// CHOOSE TEXTURE BASED ON LEVEL
+	if (currentLevel == LEVEL_CANDY) {
+		if (tex_sky.texture[0] > 0) {
+			glBindTexture(GL_TEXTURE_2D, tex_sky.texture[0]);
+		}
+	}
+	else {
+		// Fire Level
+		if (tex_sky_fire.texture[0] > 0) {
+			glBindTexture(GL_TEXTURE_2D, tex_sky_fire.texture[0]);
+		}
+	}
+
+	// 3. Move the sky with the player so they can never reach the horizon
+	// Use BMO's position or Eye position
+	glTranslatef(model_bmo.pos_x, model_bmo.pos_y, model_bmo.pos_z);
+
+	// 4. Rotate to fix texture orientation (images are often upside down in GL)
+	glRotatef(90, 1, 0, 0);
+
+	// 5. Draw the Sphere using GLU (Radius 2000)
+	gluSphere(skyQuad, 2000.0, 32, 32);
+
+	// 6. Restore settings for other objects
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glDepthMask(GL_TRUE);
+	glEnable(GL_LIGHTING);
+
+	glPopMatrix();
+}
+
 void myDisplay(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -942,22 +964,11 @@ void myDisplay(void)
 	// RENDER ENVIRONMENT BASED ON LEVEL
 	// ============================================
 
+	// --- DRAW SKY (Now using the sphere function) ---
+	DrawSkySphere();
+
 	if (currentLevel == LEVEL_CANDY)
 	{
-		// --- DRAW SKY (Background) ---
-		glPushMatrix();
-		glDisable(GL_LIGHTING);
-		glEnable(GL_TEXTURE_2D);
-		glColor3f(1.0f, 1.0f, 1.0f);
-		if (tex_sky.texture[0] > 0) {
-			glBindTexture(GL_TEXTURE_2D, tex_sky.texture[0]);
-		}
-		glTranslatef(model_sky.pos_x, model_sky.pos_y, model_sky.pos_z);
-		model_sky.Draw();
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glEnable(GL_LIGHTING);
-		glPopMatrix();
-
 		// Draw Candy Kingdom
 		model_candy_kingdom.Draw();
 
@@ -977,6 +988,33 @@ void myDisplay(void)
 		glBindTexture(GL_TEXTURE_2D, tex_finn.texture[0]);
 		model_finn.Draw();
 		glBindTexture(GL_TEXTURE_2D, 0);
+		glPopMatrix();
+
+		// --- DRAW THE LICH (NEW) ---
+		glPushMatrix();
+		glColor3f(1.0f, 1.0f, 1.0f);
+
+		// Apply Lich transformations
+		glTranslatef(model_lich.pos_x, model_lich.pos_y, model_lich.pos_z);
+		glRotatef(model_lich.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
+		glRotatef(model_lich.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
+		glRotatef(model_lich.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
+
+		// Temporarily reset position for proper rendering relative to model origin
+		float temp_lich_x = model_lich.pos_x;
+		float temp_lich_y = model_lich.pos_y;
+		float temp_lich_z = model_lich.pos_z;
+		model_lich.pos_x = 0.0f;
+		model_lich.pos_y = 0.0f;
+		model_lich.pos_z = 0.0f;
+
+		model_lich.Draw();
+
+		// Restore position
+		model_lich.pos_x = temp_lich_x;
+		model_lich.pos_y = temp_lich_y;
+		model_lich.pos_z = temp_lich_z;
+
 		glPopMatrix();
 
 		// Cupcakes
@@ -1050,18 +1088,38 @@ void myDisplay(void)
 	}
 	else if (currentLevel == LEVEL_FIRE)
 	{
-		// --- DRAW SKY (Background) ---
+		// --- DRAW FIRE KINGDOM TEMPLE ---
 		glPushMatrix();
-		glDisable(GL_LIGHTING);
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
-		if (tex_sky.texture[0] > 0) {
-			glBindTexture(GL_TEXTURE_2D, tex_sky.texture[0]);
-		}
-		glTranslatef(model_sky.pos_x, model_sky.pos_y, model_sky.pos_z);
-		model_sky.Draw();
+
+		// Bind the Fire Temple Texture
+		glBindTexture(GL_TEXTURE_2D, tex_fire_temple.texture[0]);
+
+		// Apply transformations to flip it right-side up
+		glTranslatef(model_fire_temple.pos_x, model_fire_temple.pos_y, model_fire_temple.pos_z);
+
+		// Apply rotation - X-axis first (flip upside down)
+		glRotatef(model_fire_temple.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis rotation (180 degrees)
+		glRotatef(model_fire_temple.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis rotation
+		glRotatef(model_fire_temple.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis rotation
+
+		// Temporarily reset position to origin for proper rotation
+		float temp_x = model_fire_temple.pos_x;
+		float temp_y = model_fire_temple.pos_y;
+		float temp_z = model_fire_temple.pos_z;
+		model_fire_temple.pos_x = 0.0f;
+		model_fire_temple.pos_y = 0.0f;
+		model_fire_temple.pos_z = 0.0f;
+
+		model_fire_temple.Draw();
+
+		// Restore position
+		model_fire_temple.pos_x = temp_x;
+		model_fire_temple.pos_y = temp_y;
+		model_fire_temple.pos_z = temp_z;
+
 		glBindTexture(GL_TEXTURE_2D, 0);
-		glEnable(GL_LIGHTING);
 		glPopMatrix();
 
 		// --- DRAW GOLEMS ---
@@ -1260,11 +1318,13 @@ void myDisplay(void)
 		glColor3f(1.0f, 1.0f, 1.0f);
 		glBindTexture(GL_TEXTURE_2D, tex_bmo.texture[0]);
 
+		// Apply BMO transformations (position and rotation)
 		glTranslatef(model_bmo.pos_x, model_bmo.pos_y, model_bmo.pos_z);
-		glRotatef(model_bmo.rot_y, 0.0f, 1.0f, 0.0f);
-		glRotatef(model_bmo.rot_x, 1.0f, 0.0f, 0.0f);
-		glRotatef(model_bmo.rot_z, 0.0f, 0.0f, 1.0f);
+		glRotatef(model_bmo.rot_y, 0.0f, 1.0f, 0.0f);  // Y-axis (yaw)
+		glRotatef(model_bmo.rot_x, 1.0f, 0.0f, 0.0f);  // X-axis (pitch)
+		glRotatef(model_bmo.rot_z, 0.0f, 0.0f, 1.0f);  // Z-axis (roll)
 
+		// Temporarily reset position to origin for proper rendering
 		float temp_bmo_x = model_bmo.pos_x;
 		float temp_bmo_y = model_bmo.pos_y;
 		float temp_bmo_z = model_bmo.pos_z;
@@ -1277,6 +1337,7 @@ void myDisplay(void)
 
 		model_bmo.Draw();
 
+		// Restore BMO values
 		model_bmo.pos_x = temp_bmo_x;
 		model_bmo.pos_y = temp_bmo_y;
 		model_bmo.pos_z = temp_bmo_z;
@@ -1292,7 +1353,7 @@ void myDisplay(void)
 
 void myKeyboard(unsigned char button, int x, int y)
 {
-    if (gameFinished) return; // ignore input after finishing
+	if (gameFinished) return; // ignore input after finishing
 
 	float moveSpeed = 2.0f;
 	float rotSpeed = 5.0f;
@@ -1319,9 +1380,7 @@ void myKeyboard(unsigned char button, int x, int y)
 		if (TryMove(newX, newZ)) {
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
-			CheckFinnCollision();
-			CheckEnchiridionCollision();
-			CheckDemonSwordCollision();
+			CheckFinnCollision(); // Check for Level Transfer
 		}
 	}
 	break;
@@ -1335,8 +1394,6 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
-			CheckEnchiridionCollision();
-			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1350,8 +1407,6 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
-			CheckEnchiridionCollision();
-			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1365,8 +1420,6 @@ void myKeyboard(unsigned char button, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
-			CheckEnchiridionCollision();
-			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1405,7 +1458,7 @@ void myKeyboard(unsigned char button, int x, int y)
 
 void mySpecialKeys(int key, int x, int y)
 {
-    if (gameFinished) return; // ignore input after finishing
+	if (gameFinished) return; // ignore input after finishing
 
 	float moveSpeed = 2.0f;
 	float rotSpeed = 5.0f;
@@ -1423,8 +1476,6 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
-			CheckEnchiridionCollision();
-			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1438,8 +1489,6 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
-			CheckEnchiridionCollision();
-			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1453,8 +1502,6 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
-			CheckEnchiridionCollision();
-			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1468,8 +1515,6 @@ void mySpecialKeys(int key, int x, int y)
 			CheckCupcakeCollisions();
 			CheckCoinCollision();
 			CheckFinnCollision();
-			CheckEnchiridionCollision();
-			CheckDemonSwordCollision();
 		}
 	}
 	break;
@@ -1574,10 +1619,107 @@ void LoadAssets()
 	model_candy_kingdom.scale_xyz = 300.0f;
 	printf("Candy Kingdom Loaded.\n");
 
+	// --- THE LICH (Added Here) ---
+	// --- THE LICH ---
+	printf("Loading OBJ Model: The Lich...\n");
+	model_lich.Load("Models/lich/Lich.obj", "Models/lich/");
+
+	model_lich.scale_xyz = 0.5f;
+
+	// Position and Rotation
+	model_lich.pos_x = 88.0f;
+	model_lich.pos_y = 10.0f;
+	model_lich.pos_z = 50.0f;
+	model_lich.rot_x = 180.0f;
+	model_lich.rot_y = 180.0f;
+	model_lich.rot_z = 0.0f;
+	// Initialize the logic variable to match the position
+	lichStartX = model_lich.pos_x;
+	// --- MANUAL COLOR ASSIGNMENT ---
+	for (auto& entry : model_lich.materials) {
+		std::string name = entry.first; // Get the material name
+
+		// Print name to console so you can check if they match!
+		printf("Lich Material Found: %s\n", name.c_str());
+
+		// 1. DISABLE TEXTURES (Since you don't have an image)
+		entry.second.hasTexture = false;
+
+		// 2. ASSIGN COLORS BASED ON KEYWORDS
+
+		// CHECK FOR RED PARTS (The Sash / Cloth hanging down / Scythe Handle)
+		if (name.find("Red") != std::string::npos ||
+			name.find("Sash") != std::string::npos ||
+			name.find("Cloth") != std::string::npos ||
+			name.find("Handle") != std::string::npos)
+		{
+			// Dark Red
+			entry.second.diffColor[0] = 0.6f; // R
+			entry.second.diffColor[1] = 0.1f; // G
+			entry.second.diffColor[2] = 0.1f; // B
+		}
+		// CHECK FOR BONE PARTS (Skulls, Hands)
+		else if (name.find("Bone") != std::string::npos ||
+			name.find("Skull") != std::string::npos ||
+			name.find("Hand") != std::string::npos ||
+			name.find("White") != std::string::npos)
+		{
+			// Bone White (Light Beige)
+			entry.second.diffColor[0] = 0.9f;
+			entry.second.diffColor[1] = 0.9f;
+			entry.second.diffColor[2] = 0.8f;
+		}
+		// CHECK FOR METAL PARTS (Shoulder Armor, Chest)
+		else if (name.find("Metal") != std::string::npos ||
+			name.find("Armor") != std::string::npos ||
+			name.find("Silver") != std::string::npos ||
+			name.find("Grey") != std::string::npos)
+		{
+			// Light Grey
+			entry.second.diffColor[0] = 0.7f;
+			entry.second.diffColor[1] = 0.7f;
+			entry.second.diffColor[2] = 0.75f;
+		}
+		// CHECK FOR SCYTHE BLADE
+		else if (name.find("Blade") != std::string::npos)
+		{
+			// Dark Metal
+			entry.second.diffColor[0] = 0.3f;
+			entry.second.diffColor[1] = 0.3f;
+			entry.second.diffColor[2] = 0.35f;
+		}
+		// DEFAULT: EVERYTHING ELSE (The Robe)
+		else {
+			// Dark Grey (Not pure black, so lighting still works)
+			entry.second.diffColor[0] = 0.15f;
+			entry.second.diffColor[1] = 0.15f;
+			entry.second.diffColor[2] = 0.2f;
+		}
+	}
+
+	model_lich.GenerateDisplayList();
+	printf("The Lich Loaded with Manual Colors.\n");
+
+	// --- SKY 1: Candy Kingdom ---
+	printf("Loading Sky Texture 1...\n");
+	tex_sky.Load("Textures/clouds_anime_6k.bmp");
+
+	// --- SKY 2: Fire Kingdom (NEW) ---
+	printf("Loading Sky Texture 2...\n");
+	// Ensure this file exists and is resized (e.g., 2048x1024)
+	tex_sky_fire.Load("Textures/dark sky.bmp");
+
+	printf("Skies Loaded.\n");
+
 	// --- FIRE KINGDOM TEMPLE ---
 	printf("Loading OBJ Model: Fire Kingdom Temple...\n");
+	// Make sure your OBJ filename matches exactly what you have on disk
 	model_fire_temple.Load("Models/firekingdom/temple.obj", "Models/firekingdom/");
+
+	// Load the specific texture from the textures folder
 	tex_fire_temple.Load("Textures/great-temple-of-the-eternal-fire_textured_u1_v1.bmp");
+
+	// Apply texture to all materials in the fire temple model
 	for (auto& entry : model_fire_temple.materials) {
 		entry.second.tex = tex_fire_temple;
 		entry.second.hasTexture = true;
@@ -1585,6 +1727,23 @@ void LoadAssets()
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
+
+	// Scale it BIG
+	model_fire_temple.scale_xyz = 200.0f;
+
+	// Position it - FINAL TESTED VALUES
+	model_fire_temple.pos_x = 0.0f;
+	model_fire_temple.pos_y = 595.0f;  // Final value from testing
+	model_fire_temple.pos_z = 0.0f;
+
+	// Rotate to flip it right-side up - CORRECT VALUE
+	model_fire_temple.rot_x = -290.0f;  // Correct rotation value found through testing
+	model_fire_temple.rot_y = 0.0f;
+	model_fire_temple.rot_z = 0.0f;
+
+	model_fire_temple.GenerateDisplayList();
+	printf("Fire Temple Loaded.\n");
+
 	model_lava_rock_ground.scale_xyz = 600.0f;  // Larger ground to accommodate more objects
 	model_lava_rock_ground.pos_x = -111.0f;      // Center with BMO spawn
 	model_lava_rock_ground.pos_y = -50.0f;
@@ -1596,35 +1755,35 @@ void LoadAssets()
 	printf("Lava Rock Ground Loaded.\n");
 
 	// --- LOAD SHARED TEXTURES FIRST ---
-printf("Loading Shared Fire Kingdom Textures...\n");
+	printf("Loading Shared Fire Kingdom Textures...\n");
 
-// Golem Textures
-tex_golem_final.Load("Textures/texturesgolem/six.bmp");
-tex_golem_lava_eye.Load("Textures/texturesgolem/two.bmp");
-tex_golem_em_map.Load("Textures/texturesgolem/one.bmp");
-tex_golem_norma.Load("Textures/texturesgolem/three.bmp");
-tex_golem_ao.Load("Textures/texturesgolem/four.bmp");
-tex_golem_podstavka.Load("Textures/texturesgolem/five.bmp");
+	// Golem Textures
+	tex_golem_final.Load("Textures/texturesgolem/six.bmp");
+	tex_golem_lava_eye.Load("Textures/texturesgolem/two.bmp");
+	tex_golem_em_map.Load("Textures/texturesgolem/one.bmp");
+	tex_golem_norma.Load("Textures/texturesgolem/three.bmp");
+	tex_golem_ao.Load("Textures/texturesgolem/four.bmp");
+	tex_golem_podstavka.Load("Textures/texturesgolem/five.bmp");
 
-// Fire Rock Textures
-tex_fire_rock_20.Load("Textures/texturesrock/rock20_tex00.bmp");
-tex_fire_rock_0.Load("Textures/texturesrock/rock0_tex00.bmp");
+	// Fire Rock Textures
+	tex_fire_rock_20.Load("Textures/texturesrock/rock20_tex00.bmp");
+	tex_fire_rock_0.Load("Textures/texturesrock/rock0_tex00.bmp");
 
-// Lava Hammer Textures
-tex_lava_hammer_base.Load("Textures/textureslavahammer/phong1SG_Base_color.bmp");
-tex_lava_hammer_emissive.Load("Textures/textureslavahammer/phong1SG_Emissive.bmp");
-tex_lava_hammer_roughness.Load("Textures/textureslavahammer/phong1SG_Roughness.bmp");
-tex_lava_hammer_metallic.Load("Textures/textureslavahammer/phong1SG_Metallic.bmp");
-tex_lava_hammer_normal.Load("Textures/textureslavahammer/phong1SG_Normal_OpenGL.bmp");
+	// Lava Hammer Textures
+	tex_lava_hammer_base.Load("Textures/textureslavahammer/phong1SG_Base_color.bmp");
+	tex_lava_hammer_emissive.Load("Textures/textureslavahammer/phong1SG_Emissive.bmp");
+	tex_lava_hammer_roughness.Load("Textures/textureslavahammer/phong1SG_Roughness.bmp");
+	tex_lava_hammer_metallic.Load("Textures/textureslavahammer/phong1SG_Metallic.bmp");
+	tex_lava_hammer_normal.Load("Textures/textureslavahammer/phong1SG_Normal_OpenGL.bmp");
 
-// Demon Sword Textures
-tex_demon_sword_albedo.Load("Textures/texturesdemonsword/albedo.bmp");
-tex_demon_sword_ao.Load("Textures/texturesdemonsword/ao.bmp");
-tex_demon_sword_gloss.Load("Textures/texturesdemonsword/gloss.bmp");
-tex_demon_sword_normal.Load("Textures/texturesdemonsword/normal.bmp");
-tex_demon_sword_specular.Load("Textures/texturesdemonsword/specular.bmp");
+	// Demon Sword Textures
+	tex_demon_sword_albedo.Load("Textures/texturesdemonsword/albedo.bmp");
+	tex_demon_sword_ao.Load("Textures/texturesdemonsword/ao.bmp");
+	tex_demon_sword_gloss.Load("Textures/texturesdemonsword/gloss.bmp");
+	tex_demon_sword_normal.Load("Textures/texturesdemonsword/normal.bmp");
+	tex_demon_sword_specular.Load("Textures/texturesdemonsword/specular.bmp");
 
-printf("Shared Textures Loaded.\n");
+	printf("Shared Textures Loaded.\n");
 	// --- GOLEMS (Multiple) ---
 	printf("Loading OBJ Model: Golems...\n");
 	for (int i = 0; i < NUM_GOLEMS; i++)
@@ -1958,15 +2117,15 @@ printf("Shared Textures Loaded.\n");
 
 	for (int i = 0; i < NUM_CUPCAKES; i++)
 	{
-	model_cupcakes[i].Load("Models/cupcake/cupcake.obj", "Models/cupcake/");
-	for (auto& entry : model_cupcakes[i].materials) {
-		entry.second.tex = tex_cupcake;
-		entry.second.hasTexture = true;
-		entry.second.diffColor[0] = 1.0f;
-		entry.second.diffColor[1] = 1.0f;
-		entry.second.diffColor[2] = 1.0f;
-	}
-	model_cupcakes[i].GenerateDisplayList();
+		model_cupcakes[i].Load("Models/cupcake/cupcake.obj", "Models/cupcake/");
+		for (auto& entry : model_cupcakes[i].materials) {
+			entry.second.tex = tex_cupcake;
+			entry.second.hasTexture = true;
+			entry.second.diffColor[0] = 1.0f;
+			entry.second.diffColor[1] = 1.0f;
+			entry.second.diffColor[2] = 1.0f;
+		}
+		model_cupcakes[i].GenerateDisplayList();
 		model_cupcakes[i].scale_xyz = 50.0f;
 		model_cupcakes[i].pos_x = 65.0f;
 		model_cupcakes[i].pos_y = 0.5f;
@@ -2099,6 +2258,7 @@ printf("Shared Textures Loaded.\n");
 	model_jelly.pos_z = 50.0f;
 	printf("Jelly Loaded.\n");
 }
+
 void myIdle(void)
 {
 	if (isJumping) {
@@ -2126,6 +2286,44 @@ void myIdle(void)
 
 	// Animate Donut (Shake/Bounce)
 	donutShakeAngle += 0.1f;
+
+	// --- LICH MOVEMENT LOGIC (NEW) ---
+	if (currentLevel == LEVEL_CANDY)
+	{
+		// 1. Move the Lich along the X axis
+		model_lich.pos_x += lichSpeed * lichDirection;
+
+		// 2. Check boundaries (Too far right OR Too far left)
+		// If he goes past (Start + Range) or (Start - Range), flip direction
+		if (model_lich.pos_x > (lichStartX + lichRange))
+		{
+			lichDirection = -1; // Go Left
+			// Rotate to face movement (180 is base X rotation fix, adding Y rotation)
+			model_lich.rot_y = 270.0f;
+		}
+		else if (model_lich.pos_x < (lichStartX - lichRange))
+		{
+			lichDirection = 1;  // Go Right
+			model_lich.rot_y = 90.0f;
+		}
+
+		// 3. Collision Detection (If BMO touches the Lich)
+		float dx = model_bmo.pos_x - model_lich.pos_x;
+		float dz = model_bmo.pos_z - model_lich.pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
+
+		if (distance < 5.0f) // 5.0 is the hit radius
+		{
+			printf("BMO was caught by the Lich! Respawning...\n");
+
+			// Push BMO back to start
+			model_bmo.pos_x = 65.0f;
+			model_bmo.pos_z = 55.0f;
+
+			// Optional: Reduce score penalty
+			if (score >= 5) score -= 5;
+		}
+	}
 
 	// --- UPDATE FMOD ---
 	fmodSystem->update();
