@@ -25,14 +25,20 @@ FMOD::Sound* sndBonk;
 FMOD::Sound* sndLevelWarp;
 FMOD::Sound* sndSparkle;
 FMOD::Sound* sndJellyBounce;
-FMOD::Sound* sndRescue;
-FMOD::Sound* sndCane;
+// Specific sounds from Feature Branch
+FMOD::Sound* sndRescue;       
+FMOD::Sound* sndCane;        
+FMOD::Sound* sndHitRock;      
+FMOD::Sound* sndHammerSmash;
+FMOD::Sound* sndZombie;
+FMOD::Sound* sndSwordSlice;
 FMOD::Sound* bgmCandy;
 FMOD::Sound* bgmFire;
 FMOD::Channel* channelBGM = 0;
 
 // Game state flags
 bool enchiridionFound = false;
+bool hasDemonSword = false; // Feature: Key required to finish game
 bool gameFinished = false;
 
 // 3D Projection Options
@@ -72,7 +78,7 @@ GameLevel currentLevel = LEVEL_CANDY;
 // Debugging Camera Height
 float cameraHeightOffset = 0.0f;
 
-// --- ANIMATION VARIABLES (PROPOSAL IMPLEMENTATION) ---
+// --- ANIMATION VARIABLES ---
 // Lighting
 float sunAngle = 0.0f;        // For Day/Night cycle
 float lavaIntensity = 1.0f;   // For flickering fire light
@@ -86,7 +92,6 @@ bool donutIsShaking = false;
 int donutShakeTimer = 0;
 
 // Collectible Animation Timers (For "On Interaction" logic)
-// When hit, timer goes up. When timer hits max, object becomes invisible.
 const int NUM_CUPCAKES = 5;
 float cupcakeAnimTimers[NUM_CUPCAKES] = { 0 };
 
@@ -110,7 +115,7 @@ float rockAnimTimers[NUM_FIRE_ROCKS] = { 0 };
 float finnJumpTimer = 0.0f;       // Moves up and down along Y
 float enchiridionPulseTimer = 0.0f; // Scale up and down
 
-// Re-declared to prevent compilation errors, but will remain 0.0 for static look
+// Static variables to prevent errors
 float cupcakeRotation = 0.0f;
 float coinRotation = 0.0f;
 float globalBounceAngle = 0.0f;
@@ -140,7 +145,8 @@ GLTexture tex_donut;
 
 // --- FIRE KINGDOM VARIABLES ---
 Model_OBJ model_fire_temple;
-GLTexture tex_fire_temple;
+GLTexture tex_fire_temple; // Retained for fallback
+GLTexture tex_lavarock_floor; // From Feature Branch
 Model_OBJ model_lava_rock_ground;
 
 // --- GOLEM VARIABLES ---
@@ -215,29 +221,52 @@ float lichRange = 40.0f;
 float lichSpeed = 0.25f;
 int lichDirection = 1;
 
-// Random positions 
+// --- LAYOUT FROM FEATURE BRANCH (Gauntlet Style) ---
+// 1. ROCK MINEFIELD
 float fireRockPositions[NUM_FIRE_ROCKS][3] = {
-	{ -118.0f, 0.0f, 2408.0f }, { -105.0f, 0.0f, 2415.0f }, { -112.0f, 0.0f, 2422.0f }, { -116.0f, 0.0f, 2430.0f },
-	{ -108.0f, 0.0f, 2438.0f }, { -114.0f, 0.0f, 2445.0f }, { -106.0f, 0.0f, 2453.0f }, { -119.0f, 0.0f, 2460.0f },
-	{ -110.0f, 0.0f, 2467.0f }, { -103.0f, 0.0f, 2474.0f }
+	{ -120.0f, 0.0f, 2400.0f }, { -80.0f,  0.0f, 2400.0f },
+	{ -100.0f, 0.0f, 2415.0f }, // Middle blocker
+	{ -130.0f, 0.0f, 2430.0f }, { -70.0f,  0.0f, 2430.0f },
+	{ -110.0f, 0.0f, 2445.0f }, { -90.0f,  0.0f, 2445.0f },
+	{ -125.0f, 0.0f, 2460.0f }, { -75.0f,  0.0f, 2460.0f },
+	{ -100.0f, 0.0f, 2470.0f }  // Middle blocker
 };
 
+// 2. HAMMER CRUSHER
 float lavaHammerPositions[NUM_LAVA_HAMMERS][3] = {
-	{ -115.0f, 0.0f, 2410.0f }, { -107.0f, 0.0f, 2420.0f }, { -113.0f, 0.0f, 2428.0f }, { -109.0f, 0.0f, 2436.0f },
-	{ -117.0f, 0.0f, 2448.0f }, { -105.0f, 0.0f, 2456.0f }, { -111.0f, 0.0f, 2464.0f }, { -104.0f, 0.0f, 2472.0f }
+	{ -110.0f, 0.0f, 2550.0f }, { -90.0f, 0.0f, 2550.0f },
+	{ -120.0f, 0.0f, 2570.0f }, { -80.0f, 0.0f, 2570.0f },
+	{ -100.0f, 0.0f, 2590.0f }, // Center hammer
+	{ -130.0f, 0.0f, 2610.0f }, { -70.0f, 0.0f, 2610.0f },
+	{ -100.0f, 0.0f, 2620.0f }
 };
 
+// 3. GOLEM GUARDS
 float golemPositions[NUM_GOLEMS][3] = {
-	{ -119.0f, 0.0f, 2406.0f }, { -108.0f, 0.0f, 2413.0f }, { -114.0f, 0.0f, 2419.0f }, { -106.0f, 0.0f, 2426.0f },
-	{ -117.0f, 0.0f, 2434.0f }, { -111.0f, 0.0f, 2441.0f }, { -104.0f, 0.0f, 2449.0f }, { -115.0f, 0.0f, 2456.0f },
-	{ -109.0f, 0.0f, 2463.0f }, { -118.0f, 0.0f, 2469.0f }, { -107.0f, 0.0f, 2475.0f }, { -103.0f, 0.0f, 2407.0f }
+	// Guarding the Sword (at 2500)
+	{ -120.0f, 0.0f, 2490.0f }, { -80.0f, 0.0f, 2490.0f },
+	{ -120.0f, 0.0f, 2510.0f }, { -80.0f, 0.0f, 2510.0f },
+
+	// Guarding the Enchiridion (at 2650)
+	{ -110.0f, 0.0f, 2630.0f }, { -90.0f, 0.0f, 2630.0f },
+	{ -130.0f, 0.0f, 2640.0f }, { -70.0f, 0.0f, 2640.0f },
+	{ -100.0f, 0.0f, 2645.0f }, // Final blocker
+
+	// Extra side guards
+	{ -140.0f, 0.0f, 2500.0f }, { -60.0f, 0.0f, 2500.0f }
 };
 
+// 4. THE DEMON SWORD (One Key Sword)
 float demonSwordPositions[NUM_DEMON_SWORDS][3] = {
-	{ -116.0f, 2.0f, 2407.0f }, { -110.0f, 2.0f, 2412.0f }, { -106.0f, 2.0f, 2418.0f }, { -113.0f, 2.0f, 2424.0f },
-	{ -119.0f, 2.0f, 2431.0f }, { -108.0f, 2.0f, 2437.0f }, { -115.0f, 2.0f, 2443.0f }, { -104.0f, 2.0f, 2450.0f },
-	{ -111.0f, 2.0f, 2456.0f }, { -117.0f, 2.0f, 2462.0f }, { -107.0f, 2.0f, 2468.0f }, { -114.0f, 2.0f, 2473.0f },
-	{ -105.0f, 2.0f, 2411.0f }, { -118.0f, 2.0f, 2447.0f }, { -109.0f, 2.0f, 2465.0f }
+	{ -100.0f, 2.0f, 2500.0f }, // KEY SWORD
+    // Extra decorative swords
+    { -110.0f, 2.0f, 2412.0f }, { -106.0f, 2.0f, 2418.0f }, 
+    { -113.0f, 2.0f, 2424.0f }, { -119.0f, 2.0f, 2431.0f }, 
+    { -108.0f, 2.0f, 2437.0f }, { -115.0f, 2.0f, 2443.0f }, 
+    { -104.0f, 2.0f, 2450.0f }, { -111.0f, 2.0f, 2456.0f }, 
+    { -117.0f, 2.0f, 2462.0f }, { -107.0f, 2.0f, 2468.0f }, 
+    { -114.0f, 2.0f, 2473.0f }, { -105.0f, 2.0f, 2411.0f }, 
+    { -118.0f, 2.0f, 2447.0f }, { -109.0f, 2.0f, 2465.0f }
 };
 
 // Coin Positions
@@ -299,6 +328,13 @@ void InitAudio()
 	fmodSystem->createSound("Audio/warp.wav", FMOD_DEFAULT, 0, &sndLevelWarp);
 	fmodSystem->createSound("Audio/sparkle.wav", FMOD_DEFAULT, 0, &sndSparkle);
 	fmodSystem->createSound("Audio/jellybounce.wav", FMOD_DEFAULT, 0, &sndJellyBounce);
+    
+    // Feature Branch Sounds
+	fmodSystem->createSound("Audio/hit-rock.wav", FMOD_DEFAULT, 0, &sndHitRock);
+	fmodSystem->createSound("Audio/hammer-smash.wav", FMOD_DEFAULT, 0, &sndHammerSmash);
+	fmodSystem->createSound("Audio/zombie.wav", FMOD_DEFAULT, 0, &sndZombie);
+	fmodSystem->createSound("Audio/sword-slice.wav", FMOD_DEFAULT, 0, &sndSwordSlice);
+
 	fmodSystem->createSound("Audio/rescue.wav", FMOD_DEFAULT, 0, &sndRescue);
 	fmodSystem->createSound("Audio/candycane.wav", FMOD_DEFAULT, 0, &sndCane);
 
@@ -318,31 +354,34 @@ void UpdateLighting()
 	glEnable(GL_LIGHT0);
 
 	if (currentLevel == LEVEL_CANDY) {
-		// --- CANDY KINGDOM: SUN ANIMATION ---
-		// Moves across the sky based on sunAngle
-		GLfloat light_position[] = { 100.0f * cos(sunAngle), 150.0f, 100.0f * sin(sunAngle), 1.0f };
-		glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+		// --- CANDY KINGDOM: DAY/NIGHT CYCLE ---
+		float rad = sunAngle * 3.14159f / 180.0f;
+		float lightX = 100.0f * sin(rad);
+		float lightY = 100.0f * cos(rad);
 
-		// Color changes: White (noon) -> Orange/Pink (sunset)
-		float intensity = fabs(cos(sunAngle * 0.5));
-		GLfloat diffuse[] = { 1.0f, 0.9f * intensity, 0.7f * intensity, 1.0f };
-		GLfloat ambient[] = { 0.3f, 0.3f * intensity, 0.3f * intensity, 1.0f };
+		GLfloat lightPosition[] = { lightX, lightY, 50.0f, 0.0f };
+		glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
 
-		glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
-		glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+		float intensity = (lightY + 100.0f) / 200.0f; 
+		if (intensity < 0.2f) intensity = 0.2f;       
+
+		GLfloat diffuseColor[] = { 1.0f, 0.5f + (0.5f * intensity), 0.5f + (0.5f * intensity), 1.0f };
+		GLfloat ambientColor[] = { 0.1f * intensity, 0.1f * intensity, 0.1f * intensity, 1.0f };
+
+		glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseColor);
+		glLightfv(GL_LIGHT0, GL_AMBIENT, ambientColor);
 	}
 	else {
-		// --- FIRE KINGDOM: LAVA FLICKER ---
-		// Static position high above
-		GLfloat light_position[] = { 0.0f, 200.0f, 2440.0f, 1.0f };
-		glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+		// --- FIRE KINGDOM: PULSING MAGMA GLOW ---
+		GLfloat lightPosition[] = { 0.0f, 80.0f, 2440.0f, 1.0f }; 
+		glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
 
-		// Intensity flickers between Red/Yellow
-		GLfloat diffuse[] = { 1.0f, 0.5f * lavaIntensity, 0.0f, 1.0f };
-		GLfloat ambient[] = { 0.4f, 0.1f * lavaIntensity, 0.0f, 1.0f };
+        // Uses lavaIntensity from Idle
+		GLfloat fireDiffuse[] = { 1.0f, 0.5f * lavaIntensity, 0.0f, 1.0f };
+		GLfloat fireAmbient[] = { 0.3f, 0.0f, 0.0f, 1.0f }; 
 
-		glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
-		glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+		glLightfv(GL_LIGHT0, GL_DIFFUSE, fireDiffuse);
+		glLightfv(GL_LIGHT0, GL_AMBIENT, fireAmbient);
 	}
 
 	GLfloat specular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -481,7 +520,8 @@ void CheckDemonSwordCollision()
 			if (swordAnimTimers[i] == 0) {
 				swordAnimTimers[i] = 1.0f;
 				score += DEMON_SWORD_POINTS;
-				fmodSystem->playSound(sndCollect, 0, false, 0);
+                hasDemonSword = true;
+				fmodSystem->playSound(sndSwordSlice, 0, false, 0);
 				printf("Demon Sword %d Collected! +%d Points\n", i + 1, DEMON_SWORD_POINTS);
 			}
 		}
@@ -492,6 +532,9 @@ void CheckEnchiridionCollision()
 {
 	if (currentLevel != LEVEL_FIRE) return;
 	if (enchiridionFound) return;
+    
+    // Feature requirement: Need sword
+    if (!hasDemonSword) return;
 
 	float enchRadius = 5.0f;
 	float dx = model_bmo.pos_x - model_enchiridion.pos_x;
@@ -526,16 +569,19 @@ void CheckFinnCollision()
 			printf(">>> TRAVELING TO FIRE KINGDOM! <<<\n");
 			currentLevel = LEVEL_FIRE;
 			fmodSystem->playSound(sndLevelWarp, 0, false, 0);
+
 			channelBGM->stop();
 			fmodSystem->playSound(bgmFire, 0, false, &channelBGM);
 			channelBGM->setVolume(0.4f);
 
-			model_bmo.pos_x = -111.0f;
-			model_bmo.pos_z = 2416.1f;
+			// --- SPAWN POSITION (Gauntlet Start) ---
+			model_bmo.pos_x = -100.0f; 
+			model_bmo.pos_z = 2350.0f; 
 			model_bmo.pos_y = 0.0f;
-			model_bmo.rot_x = -240.0f;
-			model_bmo.rot_y = 329.0f;
-			model_bmo.rot_z = 240.0f;
+			model_bmo.rot_x = 0.0f;   
+			model_bmo.rot_z = 0.0f;   
+			model_bmo.rot_y = 180.0f; 
+
 			isJumping = false;
 			jumpVelocity = 0.0f;
 		}
@@ -585,9 +631,11 @@ bool CheckFireRockCollision(float newX, float newZ)
 	float rockRadius = 2.5f;
 	for (int i = 0; i < NUM_FIRE_ROCKS; i++)
 	{
-		float dx = newX - model_fire_rocks[i].pos_x;
-		float dz = newZ - model_fire_rocks[i].pos_z;
-		float distance = sqrt(dx * dx + dz * dz);
+        // Correcting index logic search to fire rocks
+        float dx = newX - model_fire_rocks[i].pos_x;
+        float dz = newZ - model_fire_rocks[i].pos_z;
+        float distance = sqrt(dx * dx + dz * dz);
+
 		if (distance < rockRadius)
 		{
 			// PROPOSAL: Small shake / bounce + Thud / impact
@@ -689,7 +737,7 @@ bool TryMove(float newX, float newZ)
 		return false;
 	}
 
-	// 3. Golem
+	// 3. Golem - Using Feature Sounds
 	if (CheckGolemCollision(newX, newZ))
 	{
 		float minDist = 99999.0f;
@@ -718,19 +766,20 @@ bool TryMove(float newX, float newZ)
 		else if (jumpVelocity < 0.0f) {
 			jumpVelocity = jumpStrength * 1.8f;
 		}
-		fmodSystem->playSound(sndBonk, 0, false, 0);
+
+		fmodSystem->playSound(sndZombie, 0, false, 0);
 		return false;
 	}
 
-	// 4. Fire Rock
+	// 4. Fire Rock - Using Feature Sounds
 	if (CheckFireRockCollision(newX, newZ))
 	{
 		float minDist = 99999.0f;
 		int closestIdx = 0;
-		for (int i = 0; i < NUM_GOLEMS; i++)
+		for (int i = 0; i < NUM_FIRE_ROCKS; i++)
 		{
-			float dx = model_bmo.pos_x - model_golems[i].pos_x;
-			float dz = model_bmo.pos_z - model_golems[i].pos_z;
+			float dx = model_bmo.pos_x - model_fire_rocks[i].pos_x;
+			float dz = model_bmo.pos_z - model_fire_rocks[i].pos_z;
 			float dist = sqrt(dx * dx + dz * dz);
 			if (dist < minDist) { minDist = dist; closestIdx = i; }
 		}
@@ -751,24 +800,25 @@ bool TryMove(float newX, float newZ)
 		else if (jumpVelocity < 0.0f) {
 			jumpVelocity = jumpStrength * 1.8f;
 		}
-		fmodSystem->playSound(sndBonk, 0, false, 0);
+
+		fmodSystem->playSound(sndHitRock, 0, false, 0);
 		return false;
 	}
 
-	// 5. Lava Hammer
+	// 5. Lava Hammer - Using Feature Sounds
 	if (CheckLavaHammerCollision(newX, newZ))
 	{
 		float minDist = 99999.0f;
 		int closestIdx = 0;
-		for (int i = 0; i < NUM_GOLEMS; i++)
+		for (int i = 0; i < NUM_LAVA_HAMMERS; i++)
 		{
-			float dx = model_bmo.pos_x - model_golems[i].pos_x;
-			float dz = model_bmo.pos_z - model_golems[i].pos_z;
+			float dx = model_bmo.pos_x - model_lava_hammers[i].pos_x;
+			float dz = model_bmo.pos_z - model_lava_hammers[i].pos_z;
 			float dist = sqrt(dx * dx + dz * dz);
 			if (dist < minDist) { minDist = dist; closestIdx = i; }
 		}
-		float dx = model_bmo.pos_x - model_golems[closestIdx].pos_x;
-		float dz = model_bmo.pos_z - model_golems[closestIdx].pos_z;
+		float dx = model_bmo.pos_x - model_lava_hammers[closestIdx].pos_x;
+		float dz = model_bmo.pos_z - model_lava_hammers[closestIdx].pos_z;
 		float len = sqrt(dx * dx + dz * dz);
 		float nx = 0.0f, nz = -1.0f;
 		if (len > 0.001f) { nx = dx / len; nz = dz / len; }
@@ -779,7 +829,8 @@ bool TryMove(float newX, float newZ)
 		else if (jumpVelocity < 0.0f) {
 			jumpVelocity = jumpStrength * 1.8f;
 		}
-		fmodSystem->playSound(sndBonk, 0, false, 0);
+
+		fmodSystem->playSound(sndHammerSmash, 0, false, 0);
 		return false;
 	}
 
@@ -955,12 +1006,11 @@ void myDisplay(void)
 		glPushMatrix();
 		glColor3f(1.0f, 1.0f, 1.0f);
 		glTranslatef(model_lich.pos_x, model_lich.pos_y, model_lich.pos_z);
-		glRotatef(model_lich.rot_y, 0.0f, 1.0f, 0.0f);
-		glRotatef(model_lich.rot_x, 1.0f, 0.0f, 0.0f);
-		glRotatef(model_lich.rot_z, 0.0f, 0.0f, 1.0f);
-
-		// PROPOSAL: Translate back and forth + Roar / elemental (Lich Movement handled in Idle)
-		// No extra per-frame animation needed here beyond position update
+		glRotatef(model_lich.rot_y, 0.0f, 1.0f, 0.0f);  
+		glRotatef(model_lich.rot_x, 1.0f, 0.0f, 0.0f);  
+		glRotatef(model_lich.rot_z, 0.0f, 0.0f, 1.0f); 
+        
+        // PROPOSAL: Translate back and forth + Roar / elemental (Lich Movement handled in Idle)
 
 		float temp_lich_x = model_lich.pos_x;
 		float temp_lich_y = model_lich.pos_y;
@@ -984,7 +1034,7 @@ void myDisplay(void)
 					glTranslatef(model_cupcakes[i].pos_x, model_cupcakes[i].pos_y, model_cupcakes[i].pos_z);
 					glRotatef(cupcakeAnimTimers[i] * 20.0f, 0.0f, 1.0f, 0.0f); // Fast spin
 					// Scale down as it disappears
-					float scale = 1.0f - (cupcakeAnimTimers[i] / 50.0f);
+					float scale = 1.0f - (cupcakeAnimTimers[i] / 50.0f); 
 					glScalef(scale, scale, scale);
 					glTranslatef(-model_cupcakes[i].pos_x, -model_cupcakes[i].pos_y, -model_cupcakes[i].pos_z);
 					model_cupcakes[i].Draw();
@@ -1007,14 +1057,14 @@ void myDisplay(void)
 		float ox = model_donut.pos_x;
 		float oy = model_donut.pos_y;
 		float oz = model_donut.pos_z;
-
+		
 		// Apply Shake if impacted
 		float currentShake = donutIsShaking ? sin(donutShake * 20.0f) * 10.0f : 0.0f;
 
 		glTranslatef(ox, oy, oz);
 		glRotatef(model_donut.rot_y, 0, 1, 0);
-		glRotatef(currentShake, 0, 0, 1);
-
+		glRotatef(currentShake, 0, 0, 1); 
+		
 		model_donut.pos_x = 0;
 		model_donut.pos_y = 0;
 		model_donut.pos_z = 0;
@@ -1049,7 +1099,7 @@ void myDisplay(void)
 					glPopMatrix();
 				}
 				else {
-					// Normal static draw (maybe slow idle spin?)
+					// Normal static draw
 					glPushMatrix();
 					float cx = coinPositions[i][0];
 					float cy = coinPositions[i][1];
@@ -1070,7 +1120,7 @@ void myDisplay(void)
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, tex_jelly.texture[0]);
 		glColor3f(1.0f, 1.0f, 1.0f);
-
+		
 		// Apply Scaling based on interaction
 		float jx = model_jelly.pos_x;
 		float jy = model_jelly.pos_y;
@@ -1086,16 +1136,14 @@ void myDisplay(void)
 	}
 	else if (currentLevel == LEVEL_FIRE)
 	{
-		// --- DRAW FIRE KINGDOM TEMPLE ---
+		// --- DRAW FIRE KINGDOM FLOOR (Lava Rock) ---
 		glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
-		glBindTexture(GL_TEXTURE_2D, tex_fire_temple.texture[0]);
+		glBindTexture(GL_TEXTURE_2D, tex_lavarock_floor.texture[0]);
 		glTranslatef(model_fire_temple.pos_x, model_fire_temple.pos_y, model_fire_temple.pos_z);
-		glRotatef(model_fire_temple.rot_x, 1.0f, 0.0f, 0.0f);
-		glRotatef(model_fire_temple.rot_y, 0.0f, 1.0f, 0.0f);
-		glRotatef(model_fire_temple.rot_z, 0.0f, 0.0f, 1.0f);
-
+		
+		// Model drawing logic
 		float temp_x = model_fire_temple.pos_x;
 		float temp_y = model_fire_temple.pos_y;
 		float temp_z = model_fire_temple.pos_z;
@@ -1115,9 +1163,9 @@ void myDisplay(void)
 			glPushMatrix();
 			glEnable(GL_TEXTURE_2D);
 			glColor3f(1.0f, 1.0f, 1.0f);
-
-			// Animation: Translate back if hit
-			float pushZ = (golemAnimTimers[i] > 0) ? sin(golemAnimTimers[i] * 0.5f) * 2.0f : 0.0f;
+            
+            // Animation: Translate back if hit
+            float pushZ = (golemAnimTimers[i] > 0) ? sin(golemAnimTimers[i] * 0.5f) * 2.0f : 0.0f;
 
 			glTranslatef(model_golems[i].pos_x, model_golems[i].pos_y, model_golems[i].pos_z + pushZ);
 			glRotatef(model_golems[i].rot_y, 0.0f, 1.0f, 0.0f);
@@ -1145,9 +1193,9 @@ void myDisplay(void)
 			glPushMatrix();
 			glEnable(GL_TEXTURE_2D);
 			glColor3f(1.0f, 1.0f, 1.0f);
-
-			// Animation: Small bounce if hit
-			float bounceY = (rockAnimTimers[i] > 0) ? fabs(sin(rockAnimTimers[i])) * 1.0f : 0.0f;
+            
+            // Animation: Small bounce if hit
+            float bounceY = (rockAnimTimers[i] > 0) ? fabs(sin(rockAnimTimers[i])) * 1.0f : 0.0f;
 
 			glTranslatef(model_fire_rocks[i].pos_x, model_fire_rocks[i].pos_y + bounceY, model_fire_rocks[i].pos_z);
 			glRotatef(model_fire_rocks[i].rot_y, 0.0f, 1.0f, 0.0f);
@@ -1175,9 +1223,9 @@ void myDisplay(void)
 			glPushMatrix();
 			glEnable(GL_TEXTURE_2D);
 			glColor3f(1.0f, 1.0f, 1.0f);
-
-			// Animation: Pivot if hit
-			float pivotAngle = (hammerAnimTimers[i] > 0) ? sin(hammerAnimTimers[i]) * 45.0f : 0.0f;
+            
+            // Animation: Pivot if hit
+            float pivotAngle = (hammerAnimTimers[i] > 0) ? sin(hammerAnimTimers[i]) * 45.0f : 0.0f;
 
 			glTranslatef(model_lava_hammers[i].pos_x, model_lava_hammers[i].pos_y, model_lava_hammers[i].pos_z);
 			glRotatef(model_lava_hammers[i].rot_y, 0.0f, 1.0f, 0.0f);
@@ -1653,10 +1701,40 @@ void LoadAssets()
 	model_candy_kingdom.scale_xyz = 300.0f;
 	printf("Candy Kingdom Loaded.\n");
 
+	// --- FIRE KINGDOM ENVIRONMENT (LAVA ROCK FLOOR) ---
+	printf("Loading OBJ Model: Lava Rock Floor...\n");
+
+	// 1. Load the specific texture for the floor (from Feature Branch logic)
+	tex_lavarock_floor.Load("Models/lavarock/texture_0.bmp");
+
+	// 2. Load the OBJ (Feature Branch Logic: Using lavarock.obj as the floor)
+	model_fire_temple.Load("Models/lavarock/lavarock.obj", "Models/lavarock/");
+
+	// 3. Apply the texture manually to ensure it shows up
+	for (auto& entry : model_fire_temple.materials) {
+		entry.second.tex = tex_lavarock_floor; 
+		entry.second.hasTexture = true;
+		entry.second.diffColor[0] = 1.0f;
+		entry.second.diffColor[1] = 1.0f;
+		entry.second.diffColor[2] = 1.0f;
+	}
+
+	// 4. Set Scale and Position (Matches the 'Gauntlet' layout from Feature Branch)
+	model_fire_temple.scale_xyz = 250.0f;
+	model_fire_temple.pos_x = -100.0f;
+	model_fire_temple.pos_y = -30.0f;
+	model_fire_temple.pos_z = 2500.0f;
+	model_fire_temple.rot_x = 0.0f;
+	model_fire_temple.rot_y = 0.0f;
+	model_fire_temple.rot_z = 0.0f;
+
+	model_fire_temple.GenerateDisplayList();
+	printf("Lava Rock Floor Loaded with Texture.\n");
+
 	// --- THE LICH ---
 	printf("Loading OBJ Model: The Lich...\n");
 	model_lich.Load("Models/lich/Lich.obj", "Models/lich/");
-	tex_lich.Load("Textures/lich.bmp"); // ADDED
+	tex_lich.Load("Textures/lich.bmp"); // From Main Branch logic
 	model_lich.scale_xyz = 0.5f;
 
 	// Position and Rotation
@@ -1666,28 +1744,19 @@ void LoadAssets()
 	model_lich.rot_x = 180.0f;
 	model_lich.rot_y = 180.0f;
 	model_lich.rot_z = 0.0f;
-	// Initialize the logic variable to match the position
 	lichStartX = model_lich.pos_x;
-	// --- MANUAL COLOR ASSIGNMENT ---
+	
+    // Manual Texture Assignment for Lich
 	for (auto& entry : model_lich.materials) {
-		std::string name = entry.first; // Get the material name
-
-		// Print name to console so you can check if they match!
-		printf("Lich Material Found: %s\n", name.c_str());
-
-		// 1. DISABLE TEXTURES (Since you don't have an image)
-		entry.second.hasTexture = true; // CHANGED
-		entry.second.tex = tex_lich; // CHANGED
-
-		// 2. ASSIGN COLORS BASED ON KEYWORDS
-		// Reset colors to white so texture shows
+		entry.second.hasTexture = true; 
+		entry.second.tex = tex_lich; 
 		entry.second.diffColor[0] = 1.0f;
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
 
 	model_lich.GenerateDisplayList();
-	printf("The Lich Loaded with Manual Colors.\n");
+	printf("The Lich Loaded.\n");
 
 	// --- SKY 1: Candy Kingdom ---
 	printf("Loading Sky Texture 1...\n");
@@ -1695,53 +1764,9 @@ void LoadAssets()
 
 	// --- SKY 2: Fire Kingdom (NEW) ---
 	printf("Loading Sky Texture 2...\n");
-	// Ensure this file exists and is resized (e.g., 2048x1024)
 	tex_sky_fire.Load("Textures/dark sky.bmp");
 
 	printf("Skies Loaded.\n");
-
-	// --- FIRE KINGDOM TEMPLE ---
-	printf("Loading OBJ Model: Fire Kingdom Temple...\n");
-	// Make sure your OBJ filename matches exactly what you have on disk
-	model_fire_temple.Load("Models/firekingdom/temple.obj", "Models/firekingdom/");
-
-	// Load the specific texture from the textures folder
-	tex_fire_temple.Load("Textures/great-temple-of-the-eternal-fire_textured_u1_v1.bmp");
-
-	// Apply texture to all materials in the fire temple model
-	for (auto& entry : model_fire_temple.materials) {
-		entry.second.tex = tex_fire_temple;
-		entry.second.hasTexture = true;
-		entry.second.diffColor[0] = 1.0f;
-		entry.second.diffColor[1] = 1.0f;
-		entry.second.diffColor[2] = 1.0f;
-	}
-
-	// Scale it BIG
-	model_fire_temple.scale_xyz = 200.0f;
-
-	// Position it - FINAL TESTED VALUES
-	model_fire_temple.pos_x = 0.0f;
-	model_fire_temple.pos_y = 595.0f;  // Final value from testing
-	model_fire_temple.pos_z = 0.0f;
-
-	// Rotate to flip it right-side up - CORRECT VALUE
-	model_fire_temple.rot_x = -290.0f;  // Correct rotation value found through testing
-	model_fire_temple.rot_y = 0.0f;
-	model_fire_temple.rot_z = 0.0f;
-
-	model_fire_temple.GenerateDisplayList();
-	printf("Fire Temple Loaded.\n");
-
-	model_lava_rock_ground.scale_xyz = 600.0f;  // Larger ground to accommodate more objects
-	model_lava_rock_ground.pos_x = -111.0f;      // Center with BMO spawn
-	model_lava_rock_ground.pos_y = -50.0f;
-	model_lava_rock_ground.pos_z = 2440.0f;      // Center between spawn and enchiridion
-	model_lava_rock_ground.rot_x = 0.0f;
-	model_lava_rock_ground.rot_y = 0.0f;
-	model_lava_rock_ground.rot_z = 0.0f;
-	model_lava_rock_ground.GenerateDisplayList();
-	printf("Lava Rock Ground Loaded.\n");
 
 	// --- LOAD SHARED TEXTURES FIRST ---
 	printf("Loading Shared Fire Kingdom Textures...\n");
@@ -2219,13 +2244,12 @@ void LoadAssets()
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
-	// Position him in Fire Kingdom
+	// --- UPDATE RESCUE FINN (Just a Prop) ---
+	// Put him somewhere safe on the side, or near the end
 	model_finn_rescue.scale_xyz = 0.1f;
-	model_finn_rescue.pos_x = -111.0f;
+	model_finn_rescue.pos_x = -120.0f; // Off to the side
 	model_finn_rescue.pos_y = 0.0f;
-	model_finn_rescue.pos_z = 2440.0f;  // Middle between 2400 (BMO) and 2480 (Enchiridion)
-	model_finn_rescue.rot_y = 45.0f;
-
+	model_finn_rescue.pos_z = 2640.0f;
 	model_finn_rescue.GenerateDisplayList();
 
 	printf("Finn Ready.\n");
@@ -2415,7 +2439,6 @@ void main(int argc, char** argv)
 
 	LoadAssets();
 	printf("Entering Main Loop.\n");
-
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
