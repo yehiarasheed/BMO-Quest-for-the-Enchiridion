@@ -41,9 +41,6 @@ GLdouble aspectRatio = (GLdouble)WIDTH / (GLdouble)HEIGHT;
 GLdouble zNear = 0.1;
 GLdouble zFar = 3000;
 
-//finn bounce animation
-float finnBounceAngle = 0.0f;
-
 class Vector
 {
 public:
@@ -96,8 +93,8 @@ GLTexture tex_donut;
 float donutShakeAngle = 0.0f;
 
 // --- FIRE KINGDOM VARIABLES ---
-Model_OBJ model_lava_rock_ground;
-GLTexture tex_lava_rock_ground;
+Model_OBJ model_fire_temple;
+GLTexture tex_fire_temple;
 
 // --- GOLEM VARIABLES ---
 //Model_OBJ model_golem;
@@ -497,7 +494,7 @@ bool CheckGolemCollision(float newX, float newZ)
 
 bool CheckFireRockCollision(float newX, float newZ)
 {
-	if (currentLevel != LEVEL_FIRE) return false;
+    if (currentLevel != LEVEL_CANDY) return false;
 
 	float rockRadius = 2.0f;
 	for (int i = 0; i < NUM_FIRE_ROCKS; i++)
@@ -510,9 +507,9 @@ bool CheckFireRockCollision(float newX, float newZ)
 	return false;
 }
 
-bool CheckLavaHammerCollision(float newX, float newZ)
-{
-	if (currentLevel != LEVEL_FIRE) return false;
+    float dx = newX - model_candy_cane.pos_x;
+    float dz = newZ - model_candy_cane.pos_z;
+    float distance = sqrt(dx * dx + dz * dz);
 
 	float hammerRadius = 2.0f;
 	for (int i = 0; i < NUM_LAVA_HAMMERS; i++)
@@ -644,15 +641,15 @@ void CheckFinnCollision()
 			fmodSystem->playSound(bgmFire, 0, false, &channelBGM);
 			channelBGM->setVolume(0.4f);
 
-			// Place BMO on the Fire Kingdom ground - upright and grounded
+			// Place BMO on the Fire Kingdom ground
 			model_bmo.pos_x = -111.0f;
-			model_bmo.pos_z = 2400.0f;  // Adjusted Z position
+			model_bmo.pos_z = 2416.1f;
 			model_bmo.pos_y = 0.0f;
 
-			// Reset rotation to be upright (like in Candy Kingdom)
-			model_bmo.rot_x = 0.0f;
-			model_bmo.rot_y = 0.0f;  // Facing forward
-			model_bmo.rot_z = 0.0f;
+			// Apply final rotation values
+			model_bmo.rot_x = -240.0f;
+			model_bmo.rot_y = 329.0f;
+			model_bmo.rot_z = 240.0f;
 
 			// Ensure physics state is stable on arrival
 			isJumping = false;
@@ -727,7 +724,7 @@ bool TryMove(float newX, float newZ)
 		return false;
 	}
 
-	// 2. Check Donut Obstacle (Candy Kingdom)
+	// 2. Check Donut Obstacle (Similar bounce logic)
 	if (CheckDonutCollision(newX, newZ))
 	{
 		float dx = model_bmo.pos_x - model_donut.pos_x;
@@ -736,10 +733,11 @@ bool TryMove(float newX, float newZ)
 		float nx = 0.0f, nz = -1.0f;
 		if (len > 0.001f) { nx = dx / len; nz = dz / len; }
 
-		float pushBack = 2.5f;
+		float pushBack = 2.5f; // Push slightly harder than jelly
 		model_bmo.pos_x = model_donut.pos_x + nx * (pushBack + 1.5f);
 		model_bmo.pos_z = model_donut.pos_z + nz * (pushBack + 1.5f);
 
+		// Bounce the player up
 		if (!isJumping) {
 			isJumping = true;
 			jumpVelocity = jumpStrength * 0.9f;
@@ -948,37 +946,14 @@ void myDisplay(void)
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
 
-		// Finn(The Portal) - with up / down animation
-			glPushMatrix();
+		// Finn (The Portal)
+		glPushMatrix();
 		glEnable(GL_TEXTURE_2D);
 		glColor3f(1.0f, 1.0f, 1.0f);
 		glBindTexture(GL_TEXTURE_2D, tex_finn.texture[0]);
-
-		float finnBounce = fabs(0.8f * sin(finnBounceAngle));
-		glTranslatef(model_finn.pos_x, model_finn.pos_y + finnBounce, model_finn.pos_z);
-		glRotatef(model_finn.rot_y, 0.0f, 1.0f, 0.0f);
-
-		// Temporarily reset to draw properly
-		float temp_finn_x = model_finn.pos_x;
-		float temp_finn_y = model_finn.pos_y;
-		float temp_finn_z = model_finn.pos_z;
-		float temp_finn_rot_y = model_finn.rot_y;
-
-		model_finn.pos_x = 0.0f;
-		model_finn.pos_y = 0.0f;
-		model_finn.pos_z = 0.0f;
-		model_finn.rot_y = 0.0f;
-
 		model_finn.Draw();
-		// Restore
-		model_finn.pos_x = temp_finn_x;
-		model_finn.pos_y = temp_finn_y;
-		model_finn.pos_z = temp_finn_z;
-		model_finn.rot_y = temp_finn_rot_y;
-
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
-
 
 		// Cupcakes
 		for (int i = 0; i < NUM_CUPCAKES; i++)
@@ -1051,15 +1026,6 @@ void myDisplay(void)
 	}
 	else if (currentLevel == LEVEL_FIRE)
 	{
-		// --- DRAW LAVA ROCK GROUND (FIRST - so it renders behind everything) ---
-		glPushMatrix();
-		glEnable(GL_TEXTURE_2D);
-		glColor3f(1.0f, 1.0f, 1.0f);
-		glBindTexture(GL_TEXTURE_2D, tex_lava_rock_ground.texture[0]);
-		model_lava_rock_ground.Draw();
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glPopMatrix();
-
 		// --- DRAW SKY (Background) ---
 		glPushMatrix();
 		glDisable(GL_LIGHTING);
@@ -1238,21 +1204,16 @@ void myDisplay(void)
 		glColor3f(1.0f, 1.0f, 1.0f);
 		glBindTexture(GL_TEXTURE_2D, tex_finn.texture[0]);
 
-		// Add same bounce animation as Candy Kingdom Finn
-		float finnBounce = fabs(0.8f * sin(finnBounceAngle));
-		glTranslatef(model_finn_rescue.pos_x, model_finn_rescue.pos_y + finnBounce, model_finn_rescue.pos_z);
+		glTranslatef(model_finn_rescue.pos_x, model_finn_rescue.pos_y, model_finn_rescue.pos_z);
 		glRotatef(model_finn_rescue.rot_y, 0.0f, 1.0f, 0.0f);
 
 		// Reset for draw
 		float temp_finn_r_x = model_finn_rescue.pos_x;
 		float temp_finn_r_y = model_finn_rescue.pos_y;
 		float temp_finn_r_z = model_finn_rescue.pos_z;
-		float temp_finn_r_rot_y = model_finn_rescue.rot_y;
-
 		model_finn_rescue.pos_x = 0.0f;
 		model_finn_rescue.pos_y = 0.0f;
 		model_finn_rescue.pos_z = 0.0f;
-		model_finn_rescue.rot_y = 0.0f;
 
 		model_finn_rescue.Draw();
 
@@ -1260,7 +1221,6 @@ void myDisplay(void)
 		model_finn_rescue.pos_x = temp_finn_r_x;
 		model_finn_rescue.pos_y = temp_finn_r_y;
 		model_finn_rescue.pos_z = temp_finn_r_z;
-		model_finn_rescue.rot_y = temp_finn_r_rot_y;
 
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
@@ -1495,7 +1455,7 @@ void mySpecialKeys(int key, int x, int y)
 
 void myMotion(int x, int y)
 {
-	if (!mouseRotationEnabled) return;
+	if (!mouseLookEnabled) return;
 
 	if (firstMouse) {
 		lastMouseX = x;
@@ -1590,12 +1550,12 @@ void LoadAssets()
 	model_candy_kingdom.scale_xyz = 300.0f;
 	printf("Candy Kingdom Loaded.\n");
 
-	// --- LAVA ROCK GROUND (Fire Kingdom) ---
-	printf("Loading OBJ Model: Lava Rock Ground...\n");
-	model_lava_rock_ground.Load("Models/lavarock/lavarock.obj", "Models/lavarock/");
-	tex_lava_rock_ground.Load("Textures/lavatexture.bmp");
-	for (auto& entry : model_lava_rock_ground.materials) {
-		entry.second.tex = tex_lava_rock_ground;
+	// --- FIRE KINGDOM TEMPLE ---
+	printf("Loading OBJ Model: Fire Kingdom Temple...\n");
+	model_fire_temple.Load("Models/firekingdom/temple.obj", "Models/firekingdom/");
+	tex_fire_temple.Load("Textures/great-temple-of-the-eternal-fire_textured_u1_v1.bmp");
+	for (auto& entry : model_fire_temple.materials) {
+		entry.second.tex = tex_fire_temple;
 		entry.second.hasTexture = true;
 		entry.second.diffColor[0] = 1.0f;
 		entry.second.diffColor[1] = 1.0f;
@@ -1682,6 +1642,15 @@ printf("Shared Textures Loaded.\n");
 		model_golems[i].GenerateDisplayList();
 	}
 	printf("Golems Loaded.\n");
+	model_golem.scale_xyz = 0.5f;
+	model_golem.pos_x = -115.0f;
+	model_golem.pos_y = 0.0f;
+	model_golem.pos_z = 2418.0f;
+	model_golem.rot_x = 0.0f;
+	model_golem.rot_y = 180.0f;
+	model_golem.rot_z = 0.0f;
+	model_golem.GenerateDisplayList();
+	printf("Golem Loaded.\n");
 
 	// --- FLAME PRINCESS ---
 	printf("Loading OBJ Model: fire Princess...\n");
@@ -1742,6 +1711,15 @@ printf("Shared Textures Loaded.\n");
 		model_fire_rocks[i].GenerateDisplayList();
 	}
 	printf("Fire Rocks Loaded.\n");
+	model_fire_rock.scale_xyz = 1.0f;
+	model_fire_rock.pos_x = -118.0f;
+	model_fire_rock.pos_y = 0.0f;
+	model_fire_rock.pos_z = 2414.0f;
+	model_fire_rock.rot_x = 0.0f;
+	model_fire_rock.rot_y = 45.0f;
+	model_fire_rock.rot_z = 0.0f;
+	model_fire_rock.GenerateDisplayList();
+	printf("Fire Rock Loaded.\n");
 
 	// --- ENCHIRIDION ---
 	printf("Loading OBJ Model: Enchiridion...\n");
@@ -1894,6 +1872,15 @@ printf("Shared Textures Loaded.\n");
 		demonSwordBounceAngles[i] = i * 1.0f;  // Stagger animations
 	}
 	printf("Demon Swords Loaded.\n");
+	model_lava_hammer.scale_xyz = 1.0f;
+	model_lava_hammer.pos_x = -108.0f;
+	model_lava_hammer.pos_y = 0.0f;
+	model_lava_hammer.pos_z = 2416.0f;
+	model_lava_hammer.rot_x = 0.0f;
+	model_lava_hammer.rot_y = -30.0f;
+	model_lava_hammer.rot_z = 0.0f;
+	model_lava_hammer.GenerateDisplayList();
+	printf("Lava Hammer Loaded.\n");
 
 	// --- SKY ---
 	model_sky.GenerateDisplayList();
