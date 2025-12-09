@@ -27,6 +27,10 @@ FMOD::Sound* sndSparkle;
 FMOD::Sound* sndJellyBounce;
 FMOD::Sound* sndRescue;       // <--- NEW: Rescue sound
 FMOD::Sound* sndCane;         // <--- NEW: Candy cane collision sound
+FMOD::Sound* sndHitRock;
+FMOD::Sound* sndHammerSmash;
+FMOD::Sound* sndZombie;
+FMOD::Sound* sndSwordSlice;
 FMOD::Sound* bgmCandy;
 FMOD::Sound* bgmFire;
 FMOD::Channel* channelBGM = 0;
@@ -308,6 +312,10 @@ void InitAudio()
 	fmodSystem->createSound("Audio/warp.wav", FMOD_DEFAULT, 0, &sndLevelWarp);
 	fmodSystem->createSound("Audio/sparkle.wav", FMOD_DEFAULT, 0, &sndSparkle);
 	fmodSystem->createSound("Audio/jellybounce.wav", FMOD_DEFAULT, 0, &sndJellyBounce);
+	fmodSystem->createSound("Audio/hit-rock.wav", FMOD_DEFAULT, 0, &sndHitRock);
+	fmodSystem->createSound("Audio/hammer-smash.wav", FMOD_DEFAULT, 0, &sndHammerSmash);
+	fmodSystem->createSound("Audio/zombie.wav", FMOD_DEFAULT, 0, &sndZombie);
+	fmodSystem->createSound("Audio/sword-slice.wav", FMOD_DEFAULT, 0, &sndSwordSlice);
 
 	// --- LOAD RESCUE SOUND ---
 	fmodSystem->createSound("Audio/rescue.wav", FMOD_DEFAULT, 0, &sndRescue);
@@ -558,7 +566,6 @@ void CheckCoinCollision()
 void CheckDemonSwordCollision()
 {
 	if (currentLevel != LEVEL_FIRE) return;
-
 	float swordCollisionRadius = 3.0f;
 
 	for (int i = 0; i < NUM_DEMON_SWORDS; i++)
@@ -574,7 +581,8 @@ void CheckDemonSwordCollision()
 			demonSwordsVisible[i] = false;
 			score += DEMON_SWORD_POINTS;
 
-			fmodSystem->playSound(sndCollect, 0, false, 0);
+			// --- PLAY SWORD SLICE SOUND ---
+			fmodSystem->playSound(sndSwordSlice, 0, false, 0);
 
 			printf("Demon Sword %d Collected! +%d Points\n", i + 1, DEMON_SWORD_POINTS);
 		}
@@ -816,8 +824,8 @@ bool TryMove(float newX, float newZ)
 			jumpVelocity = jumpStrength * 1.8f;
 		}
 
-		fmodSystem->playSound(sndBonk, 0, false, 0);
-		printf("Bonk! You hit the Golem.\n");
+		fmodSystem->playSound(sndZombie, 0, false, 0);
+		printf("Hit Golem! (Zombie Sound)\n");
 		return false;
 	}
 
@@ -853,8 +861,8 @@ bool TryMove(float newX, float newZ)
 			jumpVelocity = jumpStrength * 1.8f;
 		}
 
-		fmodSystem->playSound(sndBonk, 0, false, 0);
-		printf("Bonk! You hit the Fire Rock.\n");
+		fmodSystem->playSound(sndHitRock, 0, false, 0);
+		printf("Hit Rock! (Rock Sound)\n");
 		return false;
 	}
 
@@ -885,8 +893,8 @@ bool TryMove(float newX, float newZ)
 			jumpVelocity = jumpStrength * 1.8f;
 		}
 
-		fmodSystem->playSound(sndBonk, 0, false, 0);
-		printf("Bonk! You hit the Lava Hammer.\n");
+		fmodSystem->playSound(sndHammerSmash, 0, false, 0);
+		printf("Hit Hammer! (Smash Sound)\n");
 		return false;
 	}
 
