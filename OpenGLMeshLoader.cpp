@@ -93,8 +93,8 @@ GLTexture tex_donut;
 float donutShakeAngle = 0.0f;
 
 // --- FIRE KINGDOM VARIABLES ---
-Model_OBJ model_lava_rock_ground;
-GLTexture tex_lava_rock_ground;
+Model_OBJ model_fire_temple;
+GLTexture tex_fire_temple;
 
 // --- GOLEM VARIABLES ---
 Model_OBJ model_golem;
@@ -387,38 +387,19 @@ bool CheckDonutCollision(float newX, float newZ)
 	return (distance < donutRadius);
 }
 
-// --- FIRE KINGDOM OBSTACLE LOGIC ---
-bool CheckGolemCollision(float newX, float newZ)
+// Strict candy cane collision: very small radius representing the model itself
+bool CheckCandyCaneCollision(float newX, float newZ)
 {
-	if (currentLevel != LEVEL_FIRE) return false;
+    if (currentLevel != LEVEL_CANDY) return false;
 
-	float golemRadius = 2.5f; // Larger radius for golem
-	float dx = newX - model_golem.pos_x;
-	float dz = newZ - model_golem.pos_z;
-	float distance = sqrt(dx * dx + dz * dz);
-	return (distance < golemRadius);
-}
+    // Strict radius representing the candy cane model itself (world units)
+    float caneRadius = 1.85f;
 
-bool CheckFireRockCollision(float newX, float newZ)
-{
-	if (currentLevel != LEVEL_FIRE) return false;
+    float dx = newX - model_candy_cane.pos_x;
+    float dz = newZ - model_candy_cane.pos_z;
+    float distance = sqrt(dx * dx + dz * dz);
 
-	float rockRadius = 2.0f;
-	float dx = newX - model_fire_rock.pos_x;
-	float dz = newZ - model_fire_rock.pos_z;
-	float distance = sqrt(dx * dx + dz * dz);
-	return (distance < rockRadius);
-}
-
-bool CheckLavaHammerCollision(float newX, float newZ)
-{
-	if (currentLevel != LEVEL_FIRE) return false;
-
-	float hammerRadius = 2.0f;
-	float dx = newX - model_lava_hammer.pos_x;
-	float dz = newZ - model_lava_hammer.pos_z;
-	float distance = sqrt(dx * dx + dz * dz);
-	return (distance < hammerRadius);
+    return (distance < caneRadius);
 }
 
 void CheckCupcakeCollisions()
@@ -497,15 +478,15 @@ void CheckFinnCollision()
 			fmodSystem->playSound(bgmFire, 0, false, &channelBGM);
 			channelBGM->setVolume(0.4f);
 
-			// Place BMO on the Fire Kingdom ground - upright and grounded
+			// Place BMO on the Fire Kingdom ground
 			model_bmo.pos_x = -111.0f;
-			model_bmo.pos_z = 2400.0f;  // Adjusted Z position
+			model_bmo.pos_z = 2416.1f;
 			model_bmo.pos_y = 0.0f;
 
-			// Reset rotation to be upright (like in Candy Kingdom)
-			model_bmo.rot_x = 0.0f;
-			model_bmo.rot_y = 0.0f;  // Facing forward
-			model_bmo.rot_z = 0.0f;
+			// Apply final rotation values
+			model_bmo.rot_x = -240.0f;
+			model_bmo.rot_y = 329.0f;
+			model_bmo.rot_z = 240.0f;
 
 			// Ensure physics state is stable on arrival
 			isJumping = false;
@@ -580,7 +561,7 @@ bool TryMove(float newX, float newZ)
 		return false;
 	}
 
-	// 2. Check Donut Obstacle (Candy Kingdom)
+	// 2. Check Donut Obstacle (Similar bounce logic)
 	if (CheckDonutCollision(newX, newZ))
 	{
 		float dx = model_bmo.pos_x - model_donut.pos_x;
@@ -589,10 +570,11 @@ bool TryMove(float newX, float newZ)
 		float nx = 0.0f, nz = -1.0f;
 		if (len > 0.001f) { nx = dx / len; nz = dz / len; }
 
-		float pushBack = 2.5f;
+		float pushBack = 2.5f; // Push slightly harder than jelly
 		model_bmo.pos_x = model_donut.pos_x + nx * (pushBack + 1.5f);
 		model_bmo.pos_z = model_donut.pos_z + nz * (pushBack + 1.5f);
 
+		// Bounce the player up
 		if (!isJumping) {
 			isJumping = true;
 			jumpVelocity = jumpStrength * 0.9f;
@@ -610,84 +592,6 @@ bool TryMove(float newX, float newZ)
 		printf("Bonk! You hit the Donut. -8 points. Score: %d\n", score);
 
 		printf("Bonk! You hit the Donut.\n");
-		return false;
-	}
-
-	// 3. Check Golem Obstacle (Fire Kingdom)
-	if (CheckGolemCollision(newX, newZ))
-	{
-		float dx = model_bmo.pos_x - model_golem.pos_x;
-		float dz = model_bmo.pos_z - model_golem.pos_z;
-		float len = sqrt(dx * dx + dz * dz);
-		float nx = 0.0f, nz = -1.0f;
-		if (len > 0.001f) { nx = dx / len; nz = dz / len; }
-
-		float pushBack = 3.0f;
-		model_bmo.pos_x = model_golem.pos_x + nx * (pushBack + 1.5f);
-		model_bmo.pos_z = model_golem.pos_z + nz * (pushBack + 1.5f);
-
-		if (!isJumping) {
-			isJumping = true;
-			jumpVelocity = jumpStrength * 0.9f;
-		}
-		else if (jumpVelocity < 0.0f) {
-			jumpVelocity = jumpStrength * 1.8f;
-		}
-
-		fmodSystem->playSound(sndBonk, 0, false, 0);
-		printf("Bonk! You hit the Golem.\n");
-		return false;
-	}
-
-	// 4. Check Fire Rock Obstacle (Fire Kingdom)
-	if (CheckFireRockCollision(newX, newZ))
-	{
-		float dx = model_bmo.pos_x - model_fire_rock.pos_x;
-		float dz = model_bmo.pos_z - model_fire_rock.pos_z;
-		float len = sqrt(dx * dx + dz * dz);
-		float nx = 0.0f, nz = -1.0f;
-		if (len > 0.001f) { nx = dx / len; nz = dz / len; }
-
-		float pushBack = 2.5f;
-		model_bmo.pos_x = model_fire_rock.pos_x + nx * (pushBack + 1.5f);
-		model_bmo.pos_z = model_fire_rock.pos_z + nz * (pushBack + 1.5f);
-
-		if (!isJumping) {
-			isJumping = true;
-			jumpVelocity = jumpStrength * 0.9f;
-		}
-		else if (jumpVelocity < 0.0f) {
-			jumpVelocity = jumpStrength * 1.8f;
-		}
-
-		fmodSystem->playSound(sndBonk, 0, false, 0);
-		printf("Bonk! You hit the Fire Rock.\n");
-		return false;
-	}
-
-	// 5. Check Lava Hammer Obstacle (Fire Kingdom)
-	if (CheckLavaHammerCollision(newX, newZ))
-	{
-		float dx = model_bmo.pos_x - model_lava_hammer.pos_x;
-		float dz = model_bmo.pos_z - model_lava_hammer.pos_z;
-		float len = sqrt(dx * dx + dz * dz);
-		float nx = 0.0f, nz = -1.0f;
-		if (len > 0.001f) { nx = dx / len; nz = dz / len; }
-
-		float pushBack = 2.5f;
-		model_bmo.pos_x = model_lava_hammer.pos_x + nx * (pushBack + 1.5f);
-		model_bmo.pos_z = model_lava_hammer.pos_z + nz * (pushBack + 1.5f);
-
-		if (!isJumping) {
-			isJumping = true;
-			jumpVelocity = jumpStrength * 0.9f;
-		}
-		else if (jumpVelocity < 0.0f) {
-			jumpVelocity = jumpStrength * 1.8f;
-		}
-
-		fmodSystem->playSound(sndBonk, 0, false, 0);
-		printf("Bonk! You hit the Lava Hammer.\n");
 		return false;
 	}
 
@@ -852,15 +756,6 @@ void myDisplay(void)
 	}
 	else if (currentLevel == LEVEL_FIRE)
 	{
-		// --- DRAW LAVA ROCK GROUND (FIRST - so it renders behind everything) ---
-		glPushMatrix();
-		glEnable(GL_TEXTURE_2D);
-		glColor3f(1.0f, 1.0f, 1.0f);
-		glBindTexture(GL_TEXTURE_2D, tex_lava_rock_ground.texture[0]);
-		model_lava_rock_ground.Draw();
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glPopMatrix();
-
 		// --- DRAW SKY (Background) ---
 		glPushMatrix();
 		glDisable(GL_LIGHTING);
@@ -873,6 +768,32 @@ void myDisplay(void)
 		model_sky.Draw();
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glEnable(GL_LIGHTING);
+		glPopMatrix();
+
+		// --- DRAW FIRE KINGDOM TEMPLE ---
+		glPushMatrix();
+		glEnable(GL_TEXTURE_2D);
+		glColor3f(1.0f, 1.0f, 1.0f);
+		glBindTexture(GL_TEXTURE_2D, tex_fire_temple.texture[0]);
+		glTranslatef(model_fire_temple.pos_x, model_fire_temple.pos_y, model_fire_temple.pos_z);
+		glRotatef(model_fire_temple.rot_x, 1.0f, 0.0f, 0.0f);
+		glRotatef(model_fire_temple.rot_y, 0.0f, 1.0f, 0.0f);
+		glRotatef(model_fire_temple.rot_z, 0.0f, 0.0f, 1.0f);
+
+		float temp_x = model_fire_temple.pos_x;
+		float temp_y = model_fire_temple.pos_y;
+		float temp_z = model_fire_temple.pos_z;
+		model_fire_temple.pos_x = 0.0f;
+		model_fire_temple.pos_y = 0.0f;
+		model_fire_temple.pos_z = 0.0f;
+
+		model_fire_temple.Draw();
+
+		model_fire_temple.pos_x = temp_x;
+		model_fire_temple.pos_y = temp_y;
+		model_fire_temple.pos_z = temp_z;
+
+		glBindTexture(GL_TEXTURE_2D, 0);
 		glPopMatrix();
 
 		// --- DRAW GOLEM ---
@@ -1334,26 +1255,26 @@ void LoadAssets()
 	model_candy_kingdom.scale_xyz = 300.0f;
 	printf("Candy Kingdom Loaded.\n");
 
-	// --- LAVA ROCK GROUND (Fire Kingdom) ---
-	printf("Loading OBJ Model: Lava Rock Ground...\n");
-	model_lava_rock_ground.Load("Models/lavarock/lavarock.obj", "Models/lavarock/");
-	tex_lava_rock_ground.Load("Textures/lavatexture.bmp");
-	for (auto& entry : model_lava_rock_ground.materials) {
-		entry.second.tex = tex_lava_rock_ground;
+	// --- FIRE KINGDOM TEMPLE ---
+	printf("Loading OBJ Model: Fire Kingdom Temple...\n");
+	model_fire_temple.Load("Models/firekingdom/temple.obj", "Models/firekingdom/");
+	tex_fire_temple.Load("Textures/great-temple-of-the-eternal-fire_textured_u1_v1.bmp");
+	for (auto& entry : model_fire_temple.materials) {
+		entry.second.tex = tex_fire_temple;
 		entry.second.hasTexture = true;
 		entry.second.diffColor[0] = 1.0f;
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
-	model_lava_rock_ground.scale_xyz = 500.0f;  // Increased from 1.0f to make visible as ground
-	model_lava_rock_ground.pos_x = 0.0f;
-	model_lava_rock_ground.pos_y = -50.0f;  // Much lower to act as ground plane
-	model_lava_rock_ground.pos_z = 2400.0f;
-	model_lava_rock_ground.rot_x = 0.0f;
-	model_lava_rock_ground.rot_y = 0.0f;
-	model_lava_rock_ground.rot_z = 0.0f;
-	model_lava_rock_ground.GenerateDisplayList();
-	printf("Lava Rock Ground Loaded.\n");
+	model_fire_temple.scale_xyz = 200.0f;
+	model_fire_temple.pos_x = 0.0f;
+	model_fire_temple.pos_y = 595.0f;
+	model_fire_temple.pos_z = 0.0f;
+	model_fire_temple.rot_x = -290.0f;
+	model_fire_temple.rot_y = 0.0f;
+	model_fire_temple.rot_z = 0.0f;
+	model_fire_temple.GenerateDisplayList();
+	printf("Fire Temple Loaded.\n");
 
 	// --- GOLEM ---
 	printf("Loading OBJ Model: Golem...\n");
@@ -1390,13 +1311,12 @@ void LoadAssets()
 		entry.second.diffColor[2] = 1.0f;
 	}
 
-	// OBSTACLE 1: Golem - positioned in front of BMO spawn
 	model_golem.scale_xyz = 0.5f;
-	model_golem.pos_x = -111.0f;
+	model_golem.pos_x = -115.0f;
 	model_golem.pos_y = 0.0f;
-	model_golem.pos_z = 2410.0f;  // First obstacle in line
+	model_golem.pos_z = 2418.0f;
 	model_golem.rot_x = 0.0f;
-	model_golem.rot_y = 0.0f;
+	model_golem.rot_y = 180.0f;
 	model_golem.rot_z = 0.0f;
 	model_golem.GenerateDisplayList();
 	printf("Golem Loaded.\n");
@@ -1450,11 +1370,10 @@ void LoadAssets()
 		entry.second.diffColor[2] = 1.0f;
 	}
 
-	// OBSTACLE 2: Fire Rock - positioned after Golem
 	model_fire_rock.scale_xyz = 1.0f;
-	model_fire_rock.pos_x = -111.0f;
+	model_fire_rock.pos_x = -118.0f;
 	model_fire_rock.pos_y = 0.0f;
-	model_fire_rock.pos_z = 2420.0f;  // Second obstacle in line
+	model_fire_rock.pos_z = 2414.0f;
 	model_fire_rock.rot_x = 0.0f;
 	model_fire_rock.rot_y = 45.0f;
 	model_fire_rock.rot_z = 0.0f;
@@ -1545,11 +1464,10 @@ void LoadAssets()
 		entry.second.diffColor[2] = 1.0f;
 	}
 
-	// OBSTACLE 3: Lava Hammer - positioned after Fire Rock
 	model_lava_hammer.scale_xyz = 1.0f;
-	model_lava_hammer.pos_x = -111.0f;
+	model_lava_hammer.pos_x = -108.0f;
 	model_lava_hammer.pos_y = 0.0f;
-	model_lava_hammer.pos_z = 2430.0f;  // Third obstacle in line
+	model_lava_hammer.pos_z = 2416.0f;
 	model_lava_hammer.rot_x = 0.0f;
 	model_lava_hammer.rot_y = -30.0f;
 	model_lava_hammer.rot_z = 0.0f;
