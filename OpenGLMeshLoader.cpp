@@ -96,6 +96,10 @@ float donutShakeAngle = 0.0f;
 Model_OBJ model_fire_temple;
 GLTexture tex_fire_temple;
 
+// Additional single-instance models used by the Fire Kingdom
+Model_OBJ model_lava_rock_ground; // ground patch for fire kingdom
+
+
 // --- GOLEM VARIABLES ---
 //Model_OBJ model_golem;
 GLTexture tex_golem_em_map;
@@ -104,6 +108,8 @@ GLTexture tex_golem_norma;
 GLTexture tex_golem_ao;
 GLTexture tex_golem_podstavka;
 GLTexture tex_golem_final;
+// Single golem (non-array) used in some places
+Model_OBJ model_golem;
 
 // --- FLAME PRINCESS VARIABLES ---
 Model_OBJ model_flame_princess;
@@ -113,6 +119,8 @@ GLTexture tex_flame_princess;
 //Model_OBJ model_fire_rock;
 GLTexture tex_fire_rock_20;
 GLTexture tex_fire_rock_0;
+// Single fire rock reference
+Model_OBJ model_fire_rock;
 
 // --- ENCHIRIDION VARIABLES ---
 Model_OBJ model_enchiridion;
@@ -127,6 +135,8 @@ GLTexture tex_lava_hammer_emissive;
 GLTexture tex_lava_hammer_roughness;
 GLTexture tex_lava_hammer_metallic;
 GLTexture tex_lava_hammer_normal;
+// Single lava hammer reference
+Model_OBJ model_lava_hammer;
 
 // --- DEMON SWORD VARIABLES ---
 //Model_OBJ model_demon_sword;
@@ -506,20 +516,20 @@ bool CheckFireRockCollision(float newX, float newZ)
 	}
 	return false;
 }
+// Check collision against lava hammers (Fire Kingdom)
+bool CheckLavaHammerCollision(float newX, float newZ)
+{
+    if (currentLevel != LEVEL_FIRE) return false;
 
-    float dx = newX - model_candy_cane.pos_x;
-    float dz = newZ - model_candy_cane.pos_z;
-    float distance = sqrt(dx * dx + dz * dz);
-
-	float hammerRadius = 2.0f;
-	for (int i = 0; i < NUM_LAVA_HAMMERS; i++)
-	{
-		float dx = newX - model_lava_hammers[i].pos_x;
-		float dz = newZ - model_lava_hammers[i].pos_z;
-		float distance = sqrt(dx * dx + dz * dz);
-		if (distance < hammerRadius) return true;
-	}
-	return false;
+    float hammerRadius = 2.0f;
+    for (int i = 0; i < NUM_LAVA_HAMMERS; i++)
+    {
+        float dx = newX - model_lava_hammers[i].pos_x;
+        float dz = newZ - model_lava_hammers[i].pos_z;
+        float distance = sqrt(dx * dx + dz * dz);
+        if (distance < hammerRadius) return true;
+    }
+    return false;
 }
 
 
@@ -2104,7 +2114,9 @@ void myIdle(void)
 	donutShakeAngle += 0.1f;
 
 	// Animate finn
-	finnBounceAngle += 0.05f;
+// Finn bounce animation angle
+static float finnBounceAngle = 0.0f; // ensure declaration
+finnBounceAngle += 0.05f;
 
 	// Animate Demon Swords
 	for (int i = 0; i < NUM_DEMON_SWORDS; i++)
