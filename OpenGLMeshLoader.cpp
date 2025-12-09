@@ -486,57 +486,6 @@ bool CheckDonutCollision(float newX, float newZ)
 	return (distance < donutRadius);
 }
 
-// --- FIRE KINGDOM OBSTACLE LOGIC ---
-bool CheckGolemCollision(float newX, float newZ)
-{
-	if (currentLevel != LEVEL_FIRE) return false;
-
-	float golemRadius = 2.5f;
-	for (int i = 0; i < NUM_GOLEMS; i++)
-	{
-		float dx = newX - model_golems[i].pos_x;
-		float dz = newZ - model_golems[i].pos_z;
-		float distance = sqrt(dx * dx + dz * dz);
-		if (distance < golemRadius) return true;
-	}
-	return false;
-}
-
-bool CheckFireRockCollision(float newX, float newZ)
-{
-    if (currentLevel != LEVEL_CANDY) return false;
-
-	float rockRadius = 2.0f;
-	for (int i = 0; i < NUM_FIRE_ROCKS; i++)
-	{
-		float dx = newX - model_fire_rocks[i].pos_x;
-		float dz = newZ - model_fire_rocks[i].pos_z;
-		float distance = sqrt(dx * dx + dz * dz);
-		if (distance < rockRadius) return true;
-	}
-    return false;
-}
-// Check collision against lava hammers (Fire Kingdom)
-bool CheckLavaHammerCollision(float newX, float newZ)
-{
-    if (currentLevel != LEVEL_FIRE) return false;
-
-    float hammerRadius = 2.0f;
-    for (int i = 0; i < NUM_LAVA_HAMMERS; i++)
-    {
-        float dx = newX - model_lava_hammers[i].pos_x;
-        float dz = newZ - model_lava_hammers[i].pos_z;
-        float distance = sqrt(dx * dx + dz * dz);
-        if (distance < hammerRadius) return true;
-    }
-    return false;
-}
-
-// (duplicate removed during merge resolution)
-
-
-
-
 // Strict candy cane collision: very small radius representing the model itself
 bool CheckCandyCaneCollision(float newX, float newZ)
 {
@@ -2115,21 +2064,6 @@ void myIdle(void)
 
 	// Animate Donut (Shake/Bounce)
 	donutShakeAngle += 0.1f;
-
-    // Animate finn
-    // Finn bounce animation angle
-    static float finnBounceAngle = 0.0f; // ensure declaration
-    finnBounceAngle += 0.05f;
-
-	// Animate Demon Swords
-	for (int i = 0; i < NUM_DEMON_SWORDS; i++)
-	{
-		demonSwordRotations[i] += 2.0f;
-		if (demonSwordRotations[i] >= 360.0f)
-			demonSwordRotations[i] = 0.0f;
-
-		demonSwordBounceAngles[i] += 0.1f;
-	}
 
 	// --- UPDATE FMOD ---
 	fmodSystem->update();
