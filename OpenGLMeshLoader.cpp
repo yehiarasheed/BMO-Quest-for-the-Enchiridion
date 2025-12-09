@@ -424,6 +424,22 @@ bool CheckLavaHammerCollision(float newX, float newZ)
 	return (distance < hammerRadius);
 }
 
+// Strict candy cane collision: very small radius representing the model itself
+bool CheckCandyCaneCollision(float newX, float newZ)
+{
+	if (currentLevel != LEVEL_CANDY) return false;
+
+	// Strict radius representing the candy cane model itself (world units)
+	float caneRadius = 1.85f;
+
+	float dx = newX - model_candy_cane.pos_x;
+	float dz = newZ - model_candy_cane.pos_z;
+	float distance = sqrt(dx * dx + dz * dz);
+
+	return (distance < caneRadius);
+}
+
+
 void CheckCupcakeCollisions()
 {
 	if (currentLevel != LEVEL_CANDY) return;
