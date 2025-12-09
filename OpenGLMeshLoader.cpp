@@ -37,6 +37,7 @@ FMOD::Channel* channelBGM = 0;
 
 // Game state flags
 bool enchiridionFound = false;
+bool hasDemonSword = false; // Key required to finish game
 bool gameFinished = false;
 
 // 3D Projection Options
@@ -191,61 +192,48 @@ float demonSwordBounceAngles[NUM_DEMON_SWORDS];
 // Random positions between BMO spawn (Z=2400) and Enchiridion (Z=2480)
 // Spread across X range: -120 to -100 (20 unit width)
 // Spread across Z range: 2405 to 2475 (70 unit length)
+// --- NEW GAME-LIKE LEVEL LAYOUT ---
+// Center X is roughly -100. Width is about 60 units (-130 to -70).
+
+// 1. ROCK MINEFIELD (Early Level)
 float fireRockPositions[NUM_FIRE_ROCKS][3] = {
-	{ -118.0f, 0.0f, 2408.0f },
-	{ -105.0f, 0.0f, 2415.0f },
-	{ -112.0f, 0.0f, 2422.0f },
-	{ -116.0f, 0.0f, 2430.0f },
-	{ -108.0f, 0.0f, 2438.0f },
-	{ -114.0f, 0.0f, 2445.0f },
-	{ -106.0f, 0.0f, 2453.0f },
-	{ -119.0f, 0.0f, 2460.0f },
-	{ -110.0f, 0.0f, 2467.0f },
-	{ -103.0f, 0.0f, 2474.0f }
+	{ -120.0f, 0.0f, 2400.0f }, { -80.0f,  0.0f, 2400.0f },
+	{ -100.0f, 0.0f, 2415.0f }, // Middle blocker
+	{ -130.0f, 0.0f, 2430.0f }, { -70.0f,  0.0f, 2430.0f },
+	{ -110.0f, 0.0f, 2445.0f }, { -90.0f,  0.0f, 2445.0f },
+	{ -125.0f, 0.0f, 2460.0f }, { -75.0f,  0.0f, 2460.0f },
+	{ -100.0f, 0.0f, 2470.0f }  // Middle blocker
 };
 
+// 2. HAMMER CRUSHER (Late Level)
 float lavaHammerPositions[NUM_LAVA_HAMMERS][3] = {
-	{ -115.0f, 0.0f, 2410.0f },
-	{ -107.0f, 0.0f, 2420.0f },
-	{ -113.0f, 0.0f, 2428.0f },
-	{ -109.0f, 0.0f, 2436.0f },
-	{ -117.0f, 0.0f, 2448.0f },
-	{ -105.0f, 0.0f, 2456.0f },
-	{ -111.0f, 0.0f, 2464.0f },
-	{ -104.0f, 0.0f, 2472.0f }
+	{ -110.0f, 0.0f, 2550.0f }, { -90.0f, 0.0f, 2550.0f },
+	{ -120.0f, 0.0f, 2570.0f }, { -80.0f, 0.0f, 2570.0f },
+	{ -100.0f, 0.0f, 2590.0f }, // Center hammer
+	{ -130.0f, 0.0f, 2610.0f }, { -70.0f, 0.0f, 2610.0f },
+	{ -100.0f, 0.0f, 2620.0f }
 };
 
+// 3. GOLEM GUARDS (Guarding the Sword & The End)
 float golemPositions[NUM_GOLEMS][3] = {
-	{ -119.0f, 0.0f, 2406.0f },
-	{ -108.0f, 0.0f, 2413.0f },
-	{ -114.0f, 0.0f, 2419.0f },
-	{ -106.0f, 0.0f, 2426.0f },
-	{ -117.0f, 0.0f, 2434.0f },
-	{ -111.0f, 0.0f, 2441.0f },
-	{ -104.0f, 0.0f, 2449.0f },
-	{ -115.0f, 0.0f, 2456.0f },
-	{ -109.0f, 0.0f, 2463.0f },
-	{ -118.0f, 0.0f, 2469.0f },
-	{ -107.0f, 0.0f, 2475.0f },
-	{ -103.0f, 0.0f, 2407.0f }
+	// Guarding the Sword (at 2500)
+	{ -120.0f, 0.0f, 2490.0f }, { -80.0f, 0.0f, 2490.0f },
+	{ -120.0f, 0.0f, 2510.0f }, { -80.0f, 0.0f, 2510.0f },
+
+	// Guarding the Enchiridion (at 2650)
+	{ -110.0f, 0.0f, 2630.0f }, { -90.0f, 0.0f, 2630.0f },
+	{ -130.0f, 0.0f, 2640.0f }, { -70.0f, 0.0f, 2640.0f },
+	{ -100.0f, 0.0f, 2645.0f }, // Final blocker
+
+	// Extra side guards
+	{ -140.0f, 0.0f, 2500.0f }, { -60.0f, 0.0f, 2500.0f }
 };
 
+// 4. THE DEMON SWORD (One Key Sword in the Middle)
+// We only really need 1, but we can scatter the others as points.
+// The "Key" sword is the first one in the list.
 float demonSwordPositions[NUM_DEMON_SWORDS][3] = {
-	{ -116.0f, 2.0f, 2407.0f },
-	{ -110.0f, 2.0f, 2412.0f },
-	{ -106.0f, 2.0f, 2418.0f },
-	{ -113.0f, 2.0f, 2424.0f },
-	{ -119.0f, 2.0f, 2431.0f },
-	{ -108.0f, 2.0f, 2437.0f },
-	{ -115.0f, 2.0f, 2443.0f },
-	{ -104.0f, 2.0f, 2450.0f },
-	{ -111.0f, 2.0f, 2456.0f },
-	{ -117.0f, 2.0f, 2462.0f },
-	{ -107.0f, 2.0f, 2468.0f },
-	{ -114.0f, 2.0f, 2473.0f },
-	{ -105.0f, 2.0f, 2411.0f },
-	{ -118.0f, 2.0f, 2447.0f },
-	{ -109.0f, 2.0f, 2465.0f }
+	{ -100.0f, 2.0f, 2500.0f }
 };
 
 // Coin Positions
@@ -337,6 +325,12 @@ void CheckEnchiridionCollision()
 {
 	if (currentLevel != LEVEL_FIRE) return;
 	if (enchiridionFound) return;
+
+	if (!hasDemonSword) {
+		// Optional: Print message telling player to go back
+		// printf("You need the Demon Sword to unlock this!\n");
+		return;
+	}
 
 	float enchRadius = 5.0f;
 	float dx = model_bmo.pos_x - model_enchiridion.pos_x;
@@ -581,10 +575,10 @@ void CheckDemonSwordCollision()
 			demonSwordsVisible[i] = false;
 			score += DEMON_SWORD_POINTS;
 
-			// --- PLAY SWORD SLICE SOUND ---
-			fmodSystem->playSound(sndSwordSlice, 0, false, 0);
+			hasDemonSword = true;
+			printf("Demon Sword Acquired! You can now access the Enchiridion.\n");
 
-			printf("Demon Sword %d Collected! +%d Points\n", i + 1, DEMON_SWORD_POINTS);
+			fmodSystem->playSound(sndSwordSlice, 0, false, 0);
 		}
 	}
 }
@@ -608,22 +602,20 @@ void CheckFinnCollision()
 			// --- PLAY WARP SOUND AND SWITCH MUSIC ---
 			fmodSystem->playSound(sndLevelWarp, 0, false, 0);
 
-			// Switch BGM
 			channelBGM->stop();
 			fmodSystem->playSound(bgmFire, 0, false, &channelBGM);
 			channelBGM->setVolume(0.4f);
 
-			// Place BMO on the Fire Kingdom ground
-			model_bmo.pos_x = -111.0f;
-			model_bmo.pos_z = 2416.1f;
+			// --- NEW SPAWN POSITION (Start of the Gauntlet) ---
+			model_bmo.pos_x = -100.0f; // Centered in the lane
+			model_bmo.pos_z = 2350.0f; // Far back start point
 			model_bmo.pos_y = 0.0f;
 
-			// Apply final rotation values
-			model_bmo.rot_x = -240.0f;
-			model_bmo.rot_y = 329.0f;
-			model_bmo.rot_z = 240.0f;
+			// --- FIX ROTATION (Stand Straight) ---
+			model_bmo.rot_x = 0.0f;   // upright (was -240)
+			model_bmo.rot_z = 0.0f;   // upright
+			model_bmo.rot_y = 180.0f; // Face towards the end of level
 
-			// Ensure physics state is stable on arrival
 			isJumping = false;
 			jumpVelocity = 0.0f;
 		}
@@ -631,23 +623,23 @@ void CheckFinnCollision()
 	// 2. Rescue Mission (Fire Kingdom)
 	else if (currentLevel == LEVEL_FIRE)
 	{
-		if (isFinnRescued) return; // Do nothing if already rescued
+		//if (isFinnRescued) return; // Do nothing if already rescued
 
-		float rescueRadius = 3.0f;
-		float dx = model_bmo.pos_x - model_finn_rescue.pos_x;
-		float dz = model_bmo.pos_z - model_finn_rescue.pos_z;
-		float distance = sqrt(dx * dx + dz * dz);
+		//float rescueRadius = 3.0f;
+		//float dx = model_bmo.pos_x - model_finn_rescue.pos_x;
+		//float dz = model_bmo.pos_z - model_finn_rescue.pos_z;
+		//float distance = sqrt(dx * dx + dz * dz);
 
-		if (distance < rescueRadius)
-		{
-			isFinnRescued = true;
-			printf(">>> FINN RESCUED! <<<\n");
+		//if (distance < rescueRadius)
+		//{
+		//	isFinnRescued = true;
+		//	printf(">>> FINN RESCUED! <<<\n");
 
-			// --- PLAY RESCUE SOUND LOUDLY ---
-			FMOD::Channel* sfxChannel = 0;
-			fmodSystem->playSound(sndRescue, 0, false, &sfxChannel);
-			sfxChannel->setVolume(1.0f);
-		}
+		//	// --- PLAY RESCUE SOUND LOUDLY ---
+		//	FMOD::Channel* sfxChannel = 0;
+		//	fmodSystem->playSound(sndRescue, 0, false, &sfxChannel);
+		//	sfxChannel->setVolume(1.0f);
+		//}
 	}
 }
 // --- GOLEM COLLISION LOGIC ---
@@ -1650,21 +1642,13 @@ void LoadAssets()
 	//	entry.second.diffColor[2] = 1.0f;
 	//}
 
-	// 3. Set Scale and Position
-	// We scale it up huge to act as the "Ground/World"
-	model_fire_temple.scale_xyz = 500.0f;
-
-	// Position it to center around where BMO spawns in the fire level
-	model_fire_temple.pos_x = -111.0f;
-	model_fire_temple.pos_y = -20.0f;       // Move down slightly so BMO stands ON it, not IN it
-	model_fire_temple.pos_z = 2440.0f;
-
-	model_fire_temple.rot_x = 0.0f;
-	model_fire_temple.rot_y = 0.0f;
-	model_fire_temple.rot_z = 0.0f;
-
+// --- UPDATE GROUND SIZE & POSITION ---
+	// Make it cover the whole new area (2350 to 2650)
+	model_fire_temple.scale_xyz = 250.0f; // Bigger scale
+	model_fire_temple.pos_x = -100.0f;
+	model_fire_temple.pos_y = -30.0f;
+	model_fire_temple.pos_z = 2500.0f; // Center of the map
 	model_fire_temple.GenerateDisplayList();
-	printf("Lava Rock Environment Loaded.\n");
 
 	// --- LOAD SHARED TEXTURES FIRST ---
 	printf("Loading Shared Fire Kingdom Textures...\n");
@@ -1852,10 +1836,11 @@ void LoadAssets()
 		entry.second.diffColor[2] = 1.0f;
 	}
 
-	model_enchiridion.scale_xyz = 4.0f;
-	model_enchiridion.pos_x = -111.0f;
-	model_enchiridion.pos_y = 3.0f;
-	model_enchiridion.pos_z = 2480.0f;  // Far end, opposite from spawn (2400)
+	// --- UPDATE ENCHIRIDION (THE GOAL) ---
+	model_enchiridion.scale_xyz = 6.0f;
+	model_enchiridion.pos_x = -100.0f; // Center X
+	model_enchiridion.pos_y = 5.0f;
+	model_enchiridion.pos_z = 2660.0f; // Far End of the map
 	model_enchiridion.GenerateDisplayList();
 	printf("Enchiridion Loaded.\n");
 
@@ -2140,13 +2125,12 @@ void LoadAssets()
 		entry.second.diffColor[1] = 1.0f;
 		entry.second.diffColor[2] = 1.0f;
 	}
-	// Position him in Fire Kingdom
+	// --- UPDATE RESCUE FINN (Just a Prop) ---
+	// Put him somewhere safe on the side, or near the end
 	model_finn_rescue.scale_xyz = 0.1f;
-	model_finn_rescue.pos_x = -111.0f;
+	model_finn_rescue.pos_x = -120.0f; // Off to the side
 	model_finn_rescue.pos_y = 0.0f;
-	model_finn_rescue.pos_z = 2440.0f;  // Middle between 2400 (BMO) and 2480 (Enchiridion)
-	model_finn_rescue.rot_y = 45.0f;
-
+	model_finn_rescue.pos_z = 2640.0f;
 	model_finn_rescue.GenerateDisplayList();
 
 	printf("Finn Ready.\n");
