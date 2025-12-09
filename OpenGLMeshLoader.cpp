@@ -53,15 +53,17 @@ public:
 		y += value;
 		z += value;
 	}
-	
+
 };
-	
+
 
 Vector Eye(20, 5, 20);
 Vector At(0, 0, 0);
 Vector Up(0, 1, 0);
 
 int cameraZoom = 0;
+// --- LIGHTING ANIMATION VARIABLE ---
+float sunAngle = 0.0f;
 
 // Camera Mode
 enum CameraMode { FIRST_PERSON, THIRD_PERSON };
@@ -310,8 +312,8 @@ void InitAudio()
 	// --- LOAD RESCUE SOUND ---
 	fmodSystem->createSound("Audio/rescue.wav", FMOD_DEFAULT, 0, &sndRescue);
 
-    // --- LOAD CANDY CANE SOUND ---
-    fmodSystem->createSound("Audio/candycane.wav", FMOD_DEFAULT, 0, &sndCane);
+	// --- LOAD CANDY CANE SOUND ---
+	fmodSystem->createSound("Audio/candycane.wav", FMOD_DEFAULT, 0, &sndCane);
 
 	// Load Background Music
 	fmodSystem->createSound("Audio/bgm_candy.mp3", FMOD_LOOP_NORMAL, 0, &bgmCandy);
@@ -325,26 +327,26 @@ void InitAudio()
 // --- ENCHIRIDION COLLISION / GAME FINISH ---
 void CheckEnchiridionCollision()
 {
-    if (currentLevel != LEVEL_FIRE) return;
-    if (enchiridionFound) return;
+	if (currentLevel != LEVEL_FIRE) return;
+	if (enchiridionFound) return;
 
-    float enchRadius = 5.0f;
-    float dx = model_bmo.pos_x - model_enchiridion.pos_x;
-    float dz = model_bmo.pos_z - model_enchiridion.pos_z;
-    float distance = sqrt(dx * dx + dz * dz);
+	float enchRadius = 5.0f;
+	float dx = model_bmo.pos_x - model_enchiridion.pos_x;
+	float dz = model_bmo.pos_z - model_enchiridion.pos_z;
+	float distance = sqrt(dx * dx + dz * dz);
 
-    if (distance < enchRadius)
-    {
-        enchiridionFound = true;
-        gameFinished = true;
-        printf(">>> ENCHIRIDION FOUND! FINAL SCORE: %d <<<\n", score);
+	if (distance < enchRadius)
+	{
+		enchiridionFound = true;
+		gameFinished = true;
+		printf(">>> ENCHIRIDION FOUND! FINAL SCORE: %d <<<\n", score);
 
-        // Play rescue sound and stop background music
-        FMOD::Channel* sfxChannel = 0;
-        fmodSystem->playSound(sndRescue, 0, false, &sfxChannel);
-        if (sfxChannel) sfxChannel->setVolume(1.0f);
-        if (channelBGM) channelBGM->stop();
-    }
+		// Play rescue sound and stop background music
+		FMOD::Channel* sfxChannel = 0;
+		fmodSystem->playSound(sndRescue, 0, false, &sfxChannel);
+		if (sfxChannel) sfxChannel->setVolume(1.0f);
+		if (channelBGM) channelBGM->stop();
+	}
 }
 
 // Render HUD (score)
@@ -395,16 +397,16 @@ void RenderHUD()
 			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
 	}
 
-    // Show Enchiridion / Final Message
-    if (enchiridionFound)
-    {
-        char finalMsg[128];
-        sprintf(finalMsg, "ENCHIRIDION FOUND! FINAL SCORE: %d", score);
-        glColor3f(1.0f, 0.8f, 0.0f);
-        glRasterPos2i(WIDTH / 2 - 120, HEIGHT - 70);
-        for (char* c = finalMsg; *c != '\0'; ++c)
-            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
-    }
+	// Show Enchiridion / Final Message
+	if (enchiridionFound)
+	{
+		char finalMsg[128];
+		sprintf(finalMsg, "ENCHIRIDION FOUND! FINAL SCORE: %d", score);
+		glColor3f(1.0f, 0.8f, 0.0f);
+		glRasterPos2i(WIDTH / 2 - 120, HEIGHT - 70);
+		for (char* c = finalMsg; *c != '\0'; ++c)
+			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+	}
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
@@ -643,77 +645,77 @@ void CheckFinnCollision()
 // --- GOLEM COLLISION LOGIC ---
 bool CheckGolemCollision(float newX, float newZ)
 {
-    if (currentLevel != LEVEL_FIRE) return false;
+	if (currentLevel != LEVEL_FIRE) return false;
 
-    float golemRadius = 3.0f; // Adjust size if needed
+	float golemRadius = 3.0f; // Adjust size if needed
 
-    for (int i = 0; i < NUM_GOLEMS; i++)
-    {
-        float dx = newX - model_golems[i].pos_x;
-        float dz = newZ - model_golems[i].pos_z;
-        float distance = sqrt(dx * dx + dz * dz);
+	for (int i = 0; i < NUM_GOLEMS; i++)
+	{
+		float dx = newX - model_golems[i].pos_x;
+		float dz = newZ - model_golems[i].pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
 
-        if (distance < golemRadius)
-        {
-            return true;
-        }
-    }
-    return false;
+		if (distance < golemRadius)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 // --- FIRE ROCK COLLISION LOGIC ---
 bool CheckFireRockCollision(float newX, float newZ)
 {
-    if (currentLevel != LEVEL_FIRE) return false;
+	if (currentLevel != LEVEL_FIRE) return false;
 
-    float rockRadius = 2.5f; // Adjust size if needed
+	float rockRadius = 2.5f; // Adjust size if needed
 
-    for (int i = 0; i < NUM_FIRE_ROCKS; i++)
-    {
-        float dx = newX - model_fire_rocks[i].pos_x;
-        float dz = newZ - model_fire_rocks[i].pos_z;
-        float distance = sqrt(dx * dx + dz * dz);
+	for (int i = 0; i < NUM_FIRE_ROCKS; i++)
+	{
+		float dx = newX - model_fire_rocks[i].pos_x;
+		float dz = newZ - model_fire_rocks[i].pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
 
-        if (distance < rockRadius)
-        {
-            return true;
-        }
-    }
-    return false;
+		if (distance < rockRadius)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 // --- LAVA HAMMER COLLISION LOGIC ---
 bool CheckLavaHammerCollision(float newX, float newZ)
 {
-    if (currentLevel != LEVEL_FIRE) return false;
+	if (currentLevel != LEVEL_FIRE) return false;
 
-    float hammerRadius = 2.5f; // Adjust size if needed
+	float hammerRadius = 2.5f; // Adjust size if needed
 
-    for (int i = 0; i < NUM_LAVA_HAMMERS; i++)
-    {
-        float dx = newX - model_lava_hammers[i].pos_x;
-        float dz = newZ - model_lava_hammers[i].pos_z;
-        float distance = sqrt(dx * dx + dz * dz);
+	for (int i = 0; i < NUM_LAVA_HAMMERS; i++)
+	{
+		float dx = newX - model_lava_hammers[i].pos_x;
+		float dz = newZ - model_lava_hammers[i].pos_z;
+		float distance = sqrt(dx * dx + dz * dz);
 
-        if (distance < hammerRadius)
-        {
-            return true;
-        }
-    }
-    return false;
+		if (distance < hammerRadius)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 bool TryMove(float newX, float newZ)
 {
-    // Candy cane strict collision: prevent entering its exact space
-    if (CheckCandyCaneCollision(newX, newZ)) {
-        // Play cane sound and apply heavier penalty
-        fmodSystem->playSound(sndCane, 0, false, 0);
+	// Candy cane strict collision: prevent entering its exact space
+	if (CheckCandyCaneCollision(newX, newZ)) {
+		// Play cane sound and apply heavier penalty
+		fmodSystem->playSound(sndCane, 0, false, 0);
 		score -= 10; // cane penalty
-        if (score < 0) score = 0;
-        printf("Ouch! You hit the Candy Cane. -15 points. Score: %d\n", score);
-        return false;
-    }
+		if (score < 0) score = 0;
+		printf("Ouch! You hit the Candy Cane. -15 points. Score: %d\n", score);
+		return false;
+	}
 	// 1. Check Jelly Obstacle
 	if (CheckJellyCollision(newX, newZ))
 	{
@@ -933,10 +935,58 @@ void myDisplay(void)
 		gluLookAt(camX, camY, camZ, targetX, targetY, targetZ, 0.0f, 1.0f, 0.0f);
 	}
 
-	GLfloat lightIntensity[] = { 0.7,0.7,0.7,1.0f };
-	GLfloat lightPosition[] = { 0.0f,100.0f,0.0f,0.0f };
-	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
-	glLightfv(GL_LIGHT0, GL_AMBIENT, lightIntensity);
+	//GLfloat lightIntensity[] = { 0.7,0.7,0.7,1.0f };
+	//GLfloat lightPosition[] = { 0.0f,100.0f,0.0f,0.0f };
+	//glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+	//glLightfv(GL_LIGHT0, GL_AMBIENT, lightIntensity);
+	
+	// ============================================
+	// DYNAMIC LIGHTING LOGIC
+	// ============================================
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+
+	if (currentLevel == LEVEL_CANDY)
+	{
+		// --- CANDY KINGDOM: DAY/NIGHT CYCLE ---
+		// 1. Light Animation: Rotate sun position around Z-axis
+		float rad = sunAngle * 3.14159f / 180.0f;
+		float lightX = 100.0f * sin(rad);
+		float lightY = 100.0f * cos(rad);
+
+		// 0.0f at end ensures it's a positional light (not directional)
+		GLfloat lightPosition[] = { lightX, lightY, 50.0f, 0.0f };
+		glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+
+		// 2. Color Intensity Change: 
+		// White at noon (high Y), Orange/Red at sunset (low Y)
+		float intensity = (lightY + 100.0f) / 200.0f; // Normalize -100..100 to 0..1
+		if (intensity < 0.2f) intensity = 0.2f;       // Clamp minimum brightness
+
+		// Day = White (1,1,1), Sunset = Orange (1, 0.5, 0.5)
+		GLfloat diffuseColor[] = { 1.0f, 0.5f + (0.5f * intensity), 0.5f + (0.5f * intensity), 1.0f };
+		GLfloat ambientColor[] = { 0.1f * intensity, 0.1f * intensity, 0.1f * intensity, 1.0f };
+
+		glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseColor);
+		glLightfv(GL_LIGHT0, GL_AMBIENT, ambientColor);
+	}
+	else
+	{
+		// --- FIRE KINGDOM: PULSING MAGMA GLOW ---
+		// 1. Light Animation: Static position, overhead
+		GLfloat lightPosition[] = { 0.0f, 80.0f, 2440.0f, 1.0f }; // Center of Fire Kingdom
+		glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+
+		// 2. Color Intensity Change: Pulsing Red/Orange
+		float pulse = (sin(sunAngle * 0.1f) + 1.0f) / 2.0f; // Oscillates 0.0 to 1.0
+
+		// Color oscillates between deep red and bright orange
+		GLfloat fireDiffuse[] = { 1.0f, 0.2f + (0.4f * pulse), 0.0f, 1.0f };
+		GLfloat fireAmbient[] = { 0.3f, 0.0f, 0.0f, 1.0f }; // Always red ambient
+
+		glLightfv(GL_LIGHT0, GL_DIFFUSE, fireDiffuse);
+		glLightfv(GL_LIGHT0, GL_AMBIENT, fireAmbient);
+	}
 
 	// ============================================
 	// RENDER ENVIRONMENT BASED ON LEVEL
@@ -1292,7 +1342,7 @@ void myDisplay(void)
 
 void myKeyboard(unsigned char button, int x, int y)
 {
-    if (gameFinished) return; // ignore input after finishing
+	if (gameFinished) return; // ignore input after finishing
 
 	float moveSpeed = 2.0f;
 	float rotSpeed = 5.0f;
@@ -1405,7 +1455,7 @@ void myKeyboard(unsigned char button, int x, int y)
 
 void mySpecialKeys(int key, int x, int y)
 {
-    if (gameFinished) return; // ignore input after finishing
+	if (gameFinished) return; // ignore input after finishing
 
 	float moveSpeed = 2.0f;
 	float rotSpeed = 5.0f;
@@ -1574,57 +1624,70 @@ void LoadAssets()
 	model_candy_kingdom.scale_xyz = 300.0f;
 	printf("Candy Kingdom Loaded.\n");
 
-	// --- FIRE KINGDOM TEMPLE ---
-	printf("Loading OBJ Model: Fire Kingdom Temple...\n");
-	model_fire_temple.Load("Models/firekingdom/temple.obj", "Models/firekingdom/");
-	tex_fire_temple.Load("Textures/great-temple-of-the-eternal-fire_textured_u1_v1.bmp");
-	for (auto& entry : model_fire_temple.materials) {
-		entry.second.tex = tex_fire_temple;
-		entry.second.hasTexture = true;
-		entry.second.diffColor[0] = 1.0f;
-		entry.second.diffColor[1] = 1.0f;
-		entry.second.diffColor[2] = 1.0f;
-	}
-	model_lava_rock_ground.scale_xyz = 600.0f;  // Larger ground to accommodate more objects
-	model_lava_rock_ground.pos_x = -111.0f;      // Center with BMO spawn
-	model_lava_rock_ground.pos_y = -50.0f;
-	model_lava_rock_ground.pos_z = 2440.0f;      // Center between spawn and enchiridion
-	model_lava_rock_ground.rot_x = 0.0f;
-	model_lava_rock_ground.rot_y = 0.0f;
-	model_lava_rock_ground.rot_z = 0.0f;
-	model_lava_rock_ground.GenerateDisplayList();
-	printf("Lava Rock Ground Loaded.\n");
+	// --- FIRE KINGDOM ENVIRONMENT (LAVA ROCK) ---
+	printf("Loading OBJ Model: Lava Rock Environment...\n");
+
+	// 1. Load the new OBJ file
+	model_fire_temple.Load("Models/lavarock/lavarock.obj", "Models/lavarock/");
+
+	//// 2. Apply a texture
+	//// Since we don't have a specific texture for this new model, 
+	//// we will reuse the 'tex_fire_rock_20' (from the small rocks) 
+	//// so it matches the theme and doesn't look white/blank.
+	//for (auto& entry : model_fire_temple.materials) {
+	//	entry.second.tex = tex_fire_rock_20; // Reusing existing rock texture
+	//	entry.second.hasTexture = true;
+	//	entry.second.diffColor[0] = 1.0f;
+	//	entry.second.diffColor[1] = 1.0f;
+	//	entry.second.diffColor[2] = 1.0f;
+	//}
+
+	// 3. Set Scale and Position
+	// We scale it up huge to act as the "Ground/World"
+	model_fire_temple.scale_xyz = 500.0f;
+
+	// Position it to center around where BMO spawns in the fire level
+	model_fire_temple.pos_x = -111.0f;
+	model_fire_temple.pos_y = -20.0f;       // Move down slightly so BMO stands ON it, not IN it
+	model_fire_temple.pos_z = 2440.0f;
+
+	model_fire_temple.rot_x = 0.0f;
+	model_fire_temple.rot_y = 0.0f;
+	model_fire_temple.rot_z = 0.0f;
+
+	model_fire_temple.GenerateDisplayList();
+	printf("Lava Rock Environment Loaded.\n");
 
 	// --- LOAD SHARED TEXTURES FIRST ---
-printf("Loading Shared Fire Kingdom Textures...\n");
+	printf("Loading Shared Fire Kingdom Textures...\n");
 
-// Golem Textures
-tex_golem_final.Load("Textures/texturesgolem/six.bmp");
-tex_golem_lava_eye.Load("Textures/texturesgolem/two.bmp");
-tex_golem_em_map.Load("Textures/texturesgolem/one.bmp");
-tex_golem_norma.Load("Textures/texturesgolem/three.bmp");
-tex_golem_ao.Load("Textures/texturesgolem/four.bmp");
-tex_golem_podstavka.Load("Textures/texturesgolem/five.bmp");
+	// Golem Textures
+	tex_golem_final.Load("Textures/texturesgolem/six.bmp");
+	tex_golem_lava_eye.Load("Textures/texturesgolem/two.bmp");
+	tex_golem_em_map.Load("Textures/texturesgolem/one.bmp");
+	tex_golem_norma.Load("Textures/texturesgolem/three.bmp");
+	tex_golem_ao.Load("Textures/texturesgolem/four.bmp");
+	tex_golem_podstavka.Load("Textures/texturesgolem/five.bmp");
 
-// Fire Rock Textures
-tex_fire_rock_20.Load("Textures/texturesrock/rock20_tex00.bmp");
-tex_fire_rock_0.Load("Textures/texturesrock/rock0_tex00.bmp");
+	// Fire Rock Textures
+	tex_fire_rock_20.Load("Textures/texturesrock/rock20_tex00.bmp");
+	tex_fire_rock_0.Load("Textures/texturesrock/rock0_tex00.bmp");
 
-// Lava Hammer Textures
-tex_lava_hammer_base.Load("Textures/textureslavahammer/phong1SG_Base_color.bmp");
-tex_lava_hammer_emissive.Load("Textures/textureslavahammer/phong1SG_Emissive.bmp");
-tex_lava_hammer_roughness.Load("Textures/textureslavahammer/phong1SG_Roughness.bmp");
-tex_lava_hammer_metallic.Load("Textures/textureslavahammer/phong1SG_Metallic.bmp");
-tex_lava_hammer_normal.Load("Textures/textureslavahammer/phong1SG_Normal_OpenGL.bmp");
+	// Lava Hammer Textures
+	tex_lava_hammer_base.Load("Textures/textureslavahammer/phong1SG_Base_color.bmp");
+	tex_lava_hammer_emissive.Load("Textures/textureslavahammer/phong1SG_Emissive.bmp");
+	tex_lava_hammer_roughness.Load("Textures/textureslavahammer/phong1SG_Roughness.bmp");
+	tex_lava_hammer_metallic.Load("Textures/textureslavahammer/phong1SG_Metallic.bmp");
+	tex_lava_hammer_normal.Load("Textures/textureslavahammer/phong1SG_Normal_OpenGL.bmp");
 
-// Demon Sword Textures
-tex_demon_sword_albedo.Load("Textures/texturesdemonsword/albedo.bmp");
-tex_demon_sword_ao.Load("Textures/texturesdemonsword/ao.bmp");
-tex_demon_sword_gloss.Load("Textures/texturesdemonsword/gloss.bmp");
-tex_demon_sword_normal.Load("Textures/texturesdemonsword/normal.bmp");
-tex_demon_sword_specular.Load("Textures/texturesdemonsword/specular.bmp");
+	// Demon Sword Textures
+	tex_demon_sword_albedo.Load("Textures/texturesdemonsword/albedo.bmp");
+	tex_demon_sword_ao.Load("Textures/texturesdemonsword/ao.bmp");
+	tex_demon_sword_gloss.Load("Textures/texturesdemonsword/gloss.bmp");
+	tex_demon_sword_normal.Load("Textures/texturesdemonsword/normal.bmp");
+	tex_demon_sword_specular.Load("Textures/texturesdemonsword/specular.bmp");
 
-printf("Shared Textures Loaded.\n");
+	printf("Shared Textures Loaded.\n");
 	// --- GOLEMS (Multiple) ---
 	printf("Loading OBJ Model: Golems...\n");
 	for (int i = 0; i < NUM_GOLEMS; i++)
@@ -1958,15 +2021,15 @@ printf("Shared Textures Loaded.\n");
 
 	for (int i = 0; i < NUM_CUPCAKES; i++)
 	{
-	model_cupcakes[i].Load("Models/cupcake/cupcake.obj", "Models/cupcake/");
-	for (auto& entry : model_cupcakes[i].materials) {
-		entry.second.tex = tex_cupcake;
-		entry.second.hasTexture = true;
-		entry.second.diffColor[0] = 1.0f;
-		entry.second.diffColor[1] = 1.0f;
-		entry.second.diffColor[2] = 1.0f;
-	}
-	model_cupcakes[i].GenerateDisplayList();
+		model_cupcakes[i].Load("Models/cupcake/cupcake.obj", "Models/cupcake/");
+		for (auto& entry : model_cupcakes[i].materials) {
+			entry.second.tex = tex_cupcake;
+			entry.second.hasTexture = true;
+			entry.second.diffColor[0] = 1.0f;
+			entry.second.diffColor[1] = 1.0f;
+			entry.second.diffColor[2] = 1.0f;
+		}
+		model_cupcakes[i].GenerateDisplayList();
 		model_cupcakes[i].scale_xyz = 50.0f;
 		model_cupcakes[i].pos_x = 65.0f;
 		model_cupcakes[i].pos_y = 0.5f;
@@ -2112,6 +2175,10 @@ void myIdle(void)
 			jumpVelocity = 0.0f;
 		}
 	}
+
+	// --- ANIMATE LIGHTING ---
+	sunAngle += 0.5f; // Adjust speed of day/night cycle here
+	if (sunAngle > 360.0f) sunAngle -= 360.0f;
 
 	// Animate Objects
 	cupcakeRotation += 1.0f;
