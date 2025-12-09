@@ -514,7 +514,7 @@ bool CheckFireRockCollision(float newX, float newZ)
 		float distance = sqrt(dx * dx + dz * dz);
 		if (distance < rockRadius) return true;
 	}
-	return false;
+    return false;
 }
 // Check collision against lava hammers (Fire Kingdom)
 bool CheckLavaHammerCollision(float newX, float newZ)
@@ -531,6 +531,9 @@ bool CheckLavaHammerCollision(float newX, float newZ)
     }
     return false;
 }
+
+// (duplicate removed during merge resolution)
+
 
 
 
@@ -2113,10 +2116,10 @@ void myIdle(void)
 	// Animate Donut (Shake/Bounce)
 	donutShakeAngle += 0.1f;
 
-	// Animate finn
-// Finn bounce animation angle
-static float finnBounceAngle = 0.0f; // ensure declaration
-finnBounceAngle += 0.05f;
+    // Animate finn
+    // Finn bounce animation angle
+    static float finnBounceAngle = 0.0f; // ensure declaration
+    finnBounceAngle += 0.05f;
 
 	// Animate Demon Swords
 	for (int i = 0; i < NUM_DEMON_SWORDS; i++)
