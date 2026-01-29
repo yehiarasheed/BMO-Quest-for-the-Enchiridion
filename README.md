@@ -4,13 +4,13 @@ A dual-realm 3D adventure game built with OpenGL, featuring BMO from Adventure T
 
 ## Game Description
 
-In **BMO's Dual Realm Adventure**, the player begins in the vibrant Candy Kingdom, controlling BMO to navigate candy-themed obstacles such as lollipops, rolling donuts, marshmallow blocks, jelly pits, and giant candy canes while collecting candy coins and cupcakes to increase their score. The main enemy, the Lich, challenges the player by appearing intermittently, requiring strategic movement and timing to avoid damage. 
+In **BMO's Dual Realm Adventure**, the player begins in the vibrant Candy Kingdom, controlling BMO to navigate candy-themed obstacles such as lollipops, rolling donuts, jelly pits, and giant candy canes while collecting candy coins and cupcakes to increase their score. The main enemy, the Lich, challenges the player by appearing intermittently, requiring strategic movement and timing to avoid damage. 
 
 The player's goal in this level is to rescue Finn, who marks the completion of the Candy Kingdom stage. Upon rescuing Finn, the Lich escapes with the Enchiridion, transporting the adventure into the **Cursed Underworld Fortress**, a fiery and hazardous realm. 
 
-Here, the player faces a new set of dynamic obstacles including fire golems, fire rocks, and fire hammers, while evading or confronting the Fire Princess, the main enemy of this stage. The player must locate and collect the Demon Sword, which glows and animates upon interaction, and use it to unlock the Enchiridion pedestal. 
+Here, the player faces a new set of dynamic obstacles including fire golems, fire rocks, and fire hammers, while evading or confronting the Fire Princess, the main enemy of this stage. The player must locate and collect the Demon Sword, which animates upon interaction, and use it to unlock Enchiridion. 
 
-Along the way, animations, sound effects, and interactive transformations provide feedback for collisions, jumps, and collectibles, while dynamic lighting enhances the immersive experience. The game concludes when BMO successfully places the Demon Sword on the pedestal, retrieving the Enchiridion and preparing for future challenges, offering a seamless transition between levels with a clear story-driven objective.
+Along the way, animations, sound effects, and interactive transformations provide feedback for collisions, jumps, and collectibles, while dynamic lighting enhances the immersive experience. The game concludes when BMO obtains Enchiridion after collecting the Demon Sword, offering a seamless transition between levels with a clear story-driven objective.
 
 ## Game Environments
 
@@ -160,3 +160,5 @@ Based on the Adventure Time universe created by Pendleton Ward.
 ## License
 
 This is an educational project.
+
+---
